@@ -54,7 +54,7 @@
     }
     .hash-value {
       font-family: 'Courier New', monospace;
-      font-size: 1.1em; /* Increased font size */
+      font-size: 1.15em;
       font-weight: bold;
       word-break: break-all;
       color: #7af;
@@ -62,20 +62,29 @@
       letter-spacing: 0.5px;
       line-height: 1.4;
     }
+    .fingerprint-text {
+      color: #aaa;
+      font-size: 1.05em; /* Larger and more readable */
+      line-height: 1.6;
+      margin-top: 12px;
+      font-weight: 500;
+    }
     .hash-explainer {
       margin-top: 24px;
-      padding: 18px;
+      padding: 20px;
       border: 1px solid #3a3a1a;
       border-radius: 8px;
       background: #1a1a0a;
       color: #bba;
       line-height: 1.75;
-      font-size: 0.95em;
     }
     .hash-explainer h3 {
       color: #dd8;
       margin-top: 0;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .cow-story {
       margin-top: 12px;
@@ -111,6 +120,13 @@
       visibility: hidden;
       width: 0;
       height: 0;
+    }
+    /* Fix for flatpickr scrolling/greyed out days issue */
+    .flatpickr-calendar {
+      background: #1a1a1a !important;
+    }
+    .flatpickr-day.flatpickr-disabled {
+      color: #444 !important;
     }
   </style>
 </head>
@@ -148,35 +164,16 @@
     <div class="date-picker-section">
       <!-- Live hash preview -->
       <div class="hash-preview" id="hash-preview">
-        <div style="color:#aaa;font-size:0.9em;font-weight:600;">&#x26A1; SHA-256 Hash Result:</div>
+        <div style="color:#8f8;font-size:0.95em;font-weight:600;">&#x26A1; SHA-256 Hash Generated:</div>
         <div class="hash-value" id="hash-preview-value">...</div>
-        <div style="color:#666;font-size:0.8em;margin-top:10px;">
-          This 64-character string is the "fingerprint" of your password. 
-          It is the only thing sent to the server.
+        <div class="fingerprint-text">
+          This 64-character string is the <strong>"fingerprint"</strong> of your password. 
+          It is the <strong>only thing</strong> sent to the server.
         </div>
-      </div>
-
-      <!-- Explanation: How hashing works (including the cow/burger story) -->
-      <div class="hash-explainer">
-        <h3>&#x1F512; How Hashing Works</h3>
-        <p>
-          When you type or pick your birthday, your browser runs it through a <strong>hash function</strong> (SHA-256).
-          This creates a unique fingerprint which is sent to the server. 
-          <strong>Your actual birthday never leaves your device.</strong>
-        </p>
-        <div class="cow-story">
-          &#x1F404; <strong>The Cow to Burger Analogy:</strong><br>
-          Think of it like turning a cow into a burger. It is easy to go from cow &rarr; burger,
-          but <strong>absolutely impossible to reconstruct the original cow from the burger</strong>.
-          Hashing is a one-way mathematical function designed exactly like this.
-        </div>
-        <p style="margin-top:12px;">
-          Your password is never sent to the server. Instead, your browser computes this one-way fingerprint — and only the hash is transmitted.
-        </p>
       </div>
     </div>
 
-    <button class="btn" id="submit-btn">Lock Space &amp; Submit Hash</button>
+    <button class="btn" id="submit-btn">Submit Hash to Instructor</button>
     <div id="status-msg"></div>
 
     <div class="meta-disclosure">
@@ -185,12 +182,31 @@
     </div>
   </div>
 
-  <!-- New Project Explanation Section -->
+  <!-- Project Explanation Section -->
   <div class="project-explanation">
     <h2>&#x1F4DA; About This Project</h2>
     <p style="color:#bbb; line-height:1.6;">
       This application is a security demonstration designed to show how authentication works in modern web apps — and why certain common practices are dangerous.
     </p>
+
+    <!-- Hashing Explanation moved here -->
+    <div class="hash-explainer">
+      <h3>&#x1F512; How Hashing Works</h3>
+      <p>
+        When you type or pick your birthday, your browser runs it through a <strong>hash function</strong> (SHA-256).
+        This creates a unique fingerprint which is sent to the server. 
+        <strong>Your actual birthday never leaves your device.</strong>
+      </p>
+      <div class="cow-story">
+        &#x1F404; <strong>The Cow to Burger Analogy:</strong><br>
+        Think of it like turning a cow into a burger. It is easy to go from cow &rarr; burger,
+        but <strong>absolutely impossible to reconstruct the original cow from the burger</strong>.
+        Hashing is a one-way mathematical function designed exactly like this.
+      </div>
+      <p style="margin-top:12px;">
+        Your password is never sent to the server. Instead, your browser computes this one-way fingerprint — and only the hash is transmitted.
+      </p>
+    </div>
     
     <div class="warning-box">
       <strong>&#x26A0; The Illusion of Safety:</strong><br>
@@ -224,9 +240,15 @@
     dateFormat: "dmY",
     allowInput: false,
     clickOpens: false,
-    position: "auto right",
+    position: "auto center",
     minDate: "1900-01-01",
     maxDate: "2020-12-31",
+    // Fix for the scroll range / grey out issue
+    // Ensure the year selector is always visible and functional
+    onReady: function(selectedDates, dateStr, instance) {
+      const yearInput = instance.calendarContainer.querySelector('.cur-year');
+      if(yearInput) yearInput.removeAttribute('readonly');
+    },
     onChange: function(selectedDates, dateStr) {
       pwInput.value = dateStr;
       updateHash();
