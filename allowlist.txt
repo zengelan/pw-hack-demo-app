@@ -1,0 +1,9 @@
+# IP Allowlist - one rule per line
+# Formats: country:XX  cidr:x.x.x.x/n  ip:x.x.x.x  asn:NNNNN  ipv6:allow
+country:DE
+country:AT
+country:CH
+cidr:127.0.0.1/32
+cidr:10.0.0.0/8
+cidr:192.168.0.0/16
+ipv6:allow
