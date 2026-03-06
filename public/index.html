@@ -233,17 +233,36 @@
   var previewVal = document.getElementById('hash-preview-value');
   var trigger = document.getElementById('calendar-trigger');
 
+  var BIRTHDAY_MIN_DATE = new Date(1900, 0, 1);
+  var BIRTHDAY_MAX_DATE = new Date(2020, 11, 31);
+
+  function parseBirthdayInput(value) {
+    if (!/^\d{8}$/.test(value)) return null;
+    var day   = parseInt(value.slice(0, 2), 10);
+    var month = parseInt(value.slice(2, 4), 10) - 1;
+    var year  = parseInt(value.slice(4, 8), 10);
+    var date  = new Date(year, month, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+    if (date < BIRTHDAY_MIN_DATE || date > BIRTHDAY_MAX_DATE) return null;
+    return date;
+  }
+
   var fp = flatpickr("#hidden-picker", {
     locale: "de",
     dateFormat: "dmY",
     allowInput: false,
     clickOpens: false,
     position: "auto center",
-    minDate: "1900-01-01",
-    maxDate: "2020-12-31",
+    minDate: BIRTHDAY_MIN_DATE,
+    maxDate: BIRTHDAY_MAX_DATE,
+    defaultDate: BIRTHDAY_MAX_DATE,
     onReady: function(selectedDates, dateStr, instance) {
-      const yearInput = instance.calendarContainer.querySelector('.cur-year');
-      if(yearInput) yearInput.removeAttribute('readonly');
+      var yearInput = instance.calendarContainer.querySelector('.cur-year');
+      if (yearInput) yearInput.removeAttribute('readonly');
+    },
+    onOpen: function(selectedDates, dateStr, instance) {
+      var parsed = parseBirthdayInput(pwInput.value);
+      instance.jumpToDate(parsed || BIRTHDAY_MAX_DATE);
     },
     onChange: function(selectedDates, dateStr) {
       pwInput.value = dateStr;
@@ -251,11 +270,26 @@
     }
   });
 
+  function syncPickerToInput() {
+    var parsed = parseBirthdayInput(pwInput.value);
+    if (parsed) {
+      fp.setDate(parsed, false);
+      fp.jumpToDate(parsed);
+    } else {
+      fp.clear(false);
+      fp.jumpToDate(BIRTHDAY_MAX_DATE);
+    }
+  }
+
   trigger.addEventListener('click', function() {
+    syncPickerToInput();
     fp.open();
   });
 
-  pwInput.addEventListener('input', updateHash);
+  pwInput.addEventListener('input', function() {
+    syncPickerToInput();
+    updateHash();
+  });
 
   async function updateHash() {
     var val = pwInput.value;
