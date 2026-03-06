@@ -1,0 +1,21 @@
+const CY=new Date().getFullYear();
+function pad(n,w){return String(n).padStart(w,'0');}
+function isValidDate(d,m,y){const dt=new Date(y,m-1,d);return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;}
+const _cache={};
+function cached(k,fn){return _cache[k]||(_cache[k]=fn());}
+function buildBirthdays(sy,ey,full){
+  const out=[];
+  for(let y=sy;y<=ey;y++)for(let m=1;m<=12;m++){const days=new Date(y,m,0).getDate();for(let d=1;d<=days;d++)out.push(pad(d,2)+pad(m,2)+(full?String(y):String(y).slice(-2)));}
+  return out;
+}
+function buildMonths(sy,ey){const out=[];for(let y=sy;y<=ey;y++)for(let m=1;m<=12;m++)out.push(pad(m,2)+String(y));return out;}
+const SPACES={
+  pin4:{label:'4-digit PIN',pattern:'NNNN',placeholder:'e.g. 1234',description:'Every 4-digit PIN from 0000 to 9999.',examples:'0000, 1234, 9999',formula:'10^4 = 10,000 combinations.',getTotal(){return 10000;},at(i){return pad(i,4);},validate(v){if(!/^\d{4}$/.test(v))return{ok:false,msg:'Must be exactly 4 digits.'};return{ok:true,msg:'Valid 4-digit PIN.'};} },
+  num6:{label:'6-digit number',pattern:'NNNNNN',placeholder:'e.g. 150512',description:'Every 6-digit number from 000000 to 999999.',examples:'000000, 150512, 999999',formula:'10^6 = 1,000,000 combinations.',getTotal(){return 1000000;},at(i){return pad(i,6);},validate(v){if(!/^\d{6}$/.test(v))return{ok:false,msg:'Must be exactly 6 digits.'};return{ok:true,msg:'Valid 6-digit number.'};} },
+  birth6:{label:'Birthday DDMMYY',pattern:'DDMMYY',placeholder:'e.g. 150512',description:'Valid calendar dates in DDMMYY form (years 2000-2099).',examples:'010100, 150512, 291224',formula:'All real dates 2000-2099 including leap days.',getList(){return cached('b6',()=>buildBirthdays(2000,2099,false));},getTotal(){return this.getList().length;},at(i){return this.getList()[i];},validate(v){if(!/^\d{6}$/.test(v))return{ok:false,msg:'Must be 6 digits DDMMYY.'};const d=+v.slice(0,2),m=+v.slice(2,4),y=2000+(+v.slice(4,6));if(y>CY)return{ok:false,msg:'Year is in the future.'};if(!isValidDate(d,m,y))return{ok:false,msg:'Not a real calendar date.'};return{ok:true,msg:'Valid DDMMYY date.'};} },
+  birth8_school:{label:'School-age birthday DDMMYYYY',pattern:'DDMMYYYY',placeholder:'e.g. 15052012',description:`Valid birthdays 2008 to ${CY}, ideal for school demos.`,examples:'01012010, 15052012, 31122018',formula:`All real dates 2008 to ${CY} including leap days.`,getList(){return cached('b8s',()=>buildBirthdays(2008,CY,true));},getTotal(){return this.getList().length;},at(i){return this.getList()[i];},validate(v){if(!/^\d{8}$/.test(v))return{ok:false,msg:'Must be 8 digits DDMMYYYY.'};const d=+v.slice(0,2),m=+v.slice(2,4),y=+v.slice(4,8);if(y<2008||y>CY)return{ok:false,msg:`Year must be 2008-${CY}.`};if(!isValidDate(d,m,y))return{ok:false,msg:'Not a real calendar date.'};return{ok:true,msg:'Valid school-age birthday.'};} },
+  birth8_all:{label:'Birthday DDMMYYYY (1900+)',pattern:'DDMMYYYY',placeholder:'e.g. 15051995',description:`Valid birthdays 1900 to ${CY}.`,examples:'01011900, 15051995, 31122020',formula:`All real dates 1900 to ${CY} including leap days.`,getList(){return cached('b8a',()=>buildBirthdays(1900,CY,true));},getTotal(){return this.getList().length;},at(i){return this.getList()[i];},validate(v){if(!/^\d{8}$/.test(v))return{ok:false,msg:'Must be 8 digits DDMMYYYY.'};const d=+v.slice(0,2),m=+v.slice(2,4),y=+v.slice(4,8);if(y<1900||y>CY)return{ok:false,msg:`Year must be 1900-${CY}.`};if(!isValidDate(d,m,y))return{ok:false,msg:'Not a real calendar date.'};return{ok:true,msg:'Valid DDMMYYYY birthday.'};} },
+  monthyear:{label:'Month+Year MMYYYY',pattern:'MMYYYY',placeholder:'e.g. 052012',description:`Every month/year pair 1900 to ${CY}.`,examples:'011900, 052012, 122025',formula:`12 x (${CY}-1900+1) combinations.`,getList(){return cached('my',()=>buildMonths(1900,CY));},getTotal(){return this.getList().length;},at(i){return this.getList()[i];},validate(v){if(!/^\d{6}$/.test(v))return{ok:false,msg:'Must be 6 digits MMYYYY.'};const m=+v.slice(0,2),y=+v.slice(2,6);if(m<1||m>12)return{ok:false,msg:'Month must be 01-12.'};if(y<1900||y>CY)return{ok:false,msg:`Year must be 1900-${CY}.`};return{ok:true,msg:'Valid MMYYYY value.'};} }
+};
+const SPACE_ORDER=['birth8_school','birth8_all','birth6','monthyear','pin4','num6'];
+if(typeof module!=='undefined')module.exports={SPACES,SPACE_ORDER};
