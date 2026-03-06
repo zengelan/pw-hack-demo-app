@@ -11,12 +11,15 @@ async function apiFetch(path,opts={}){
 export const api={
   getHashes:()=>apiFetch('api/hashes'),
   getMyIp:()=>apiFetch('api/myip'),
-  submit:(hash,space,nickname,clientMeta)=>apiFetch('api/submit',{method:'POST',body:JSON.stringify({hash,space,nickname,clientMeta})}),
+  submit:(hash,spaceId,meta)=>apiFetch('api/submit',{method:'POST',body:JSON.stringify({hash,spaceId,meta})}),
   updateHash:(id,password,attempts)=>apiFetch('api/hash/'+id,{method:'POST',body:JSON.stringify({password,attempts})}),
   deleteHash:(id)=>apiFetch('api/hash/'+id,{method:'DELETE'}),
   clearAll:()=>apiFetch('api/clear',{method:'POST'}),
   getAllowlist:()=>apiFetch('api/allowlist'),
   updateAllowlist:(rules)=>apiFetch('api/allowlist',{method:'POST',body:JSON.stringify({rules})}),
+  getSpaces:()=>apiFetch('api/spaces'),
+  createSpace:(space)=>apiFetch('api/spaces',{method:'POST',body:JSON.stringify(space)}),
+  deleteSpace:(id)=>apiFetch('api/spaces/'+id,{method:'DELETE'}),
 };
 export function collectClientMeta(){
   return{
