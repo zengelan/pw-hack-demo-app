@@ -5,45 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Password Security Demo</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Use flatpickr for a better cross-browser date picker with German locale -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
   <style>
+    .input-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #pw-input {
+      flex: 1;
+      margin-bottom: 0 !important;
+    }
+    .calendar-btn {
+      padding: 0 16px;
+      background: #2a4a2a;
+      border: 1px solid #4a4;
+      border-radius: 6px;
+      color: #eee;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      transition: background 0.2s;
+    }
+    .calendar-btn:hover {
+      background: #3a5a3a;
+    }
     .date-picker-section {
       margin-top: 14px;
       padding: 14px;
       border: 1px solid #2a4a2a;
       border-radius: 8px;
       background: #0d1a0d;
-    }
-    .date-picker-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      color: #8f8;
-      font-size: 0.95em;
-      margin-bottom: 10px;
-    }
-    .date-picker-toggle input[type=checkbox] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-      accent-color: #4a4;
-    }
-    #date-picker-wrapper {
-      display: none;
-      flex-direction: column;
-      gap: 8px;
-    }
-    #date-picker-wrapper.visible {
-      display: flex;
-    }
-    #birthday-picker {
-      font-size: 1.1em;
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #4a4;
-      background: #1a2a1a;
-      color: #eee;
-      width: 200px;
     }
     .hash-preview {
       margin-top: 14px;
@@ -87,6 +84,13 @@
       font-style: italic;
       color: #cc9;
     }
+    /* Hide the flatpickr input but keep it for the library */
+    #hidden-picker {
+      position: absolute;
+      visibility: hidden;
+      width: 0;
+      height: 0;
+    }
   </style>
 </head>
 <body>
@@ -105,60 +109,45 @@
     <select id="space-select">
       <option value="">-- Select a space --</option>
     </select>
-    <!-- Space Info -->
     <div id="space-info"></div>
   </div>
 
   <!-- Step 2: Enter Password -->
   <div id="pw-section" class="card">
     <h2>Step 2: Enter Your Birthday as Password</h2>
-    <p style="color:#aaa;margin-bottom:12px">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998 for March 15, 1998</p>
-    <input type="text" id="pw-input" maxlength="8" placeholder="DDMMYYYY" autocomplete="off" inputmode="numeric" pattern="[0-9]{8}">
+    <p style="color:#aaa;margin-bottom:12px">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998</p>
+    
+    <div class="input-row">
+      <input type="text" id="pw-input" maxlength="8" placeholder="DDMMYYYY" autocomplete="off" inputmode="numeric" pattern="[0-9]{8}">
+      <button class="calendar-btn" id="calendar-trigger" title="Open Date Picker">&#x1F4C5;</button>
+    </div>
+    
+    <!-- Hidden input for flatpickr -->
+    <input type="text" id="hidden-picker">
 
-    <!-- Date Picker Option -->
     <div class="date-picker-section">
-      <label class="date-picker-toggle">
-        <input type="checkbox" id="use-datepicker">
-        <span>&#x1F4C5; Use a date picker instead of typing</span>
-      </label>
-      <div id="date-picker-wrapper">
-        <input type="date" id="birthday-picker"
-               min="1900-01-01" max="2020-12-31"
-               lang="de"
-               title="Select your birthday">
-        <p style="color:#888;font-size:0.85em;margin:4px 0 0">
-          Week starts on Monday &mdash; German format (DD.MM.YYYY)
-        </p>
-      </div>
-
-      <!-- Live hash preview when date picker is used -->
+      <!-- Live hash preview -->
       <div class="hash-preview" id="hash-preview">
-        <div style="color:#aaa;font-size:0.88em;">&#x26A1; Hash generated automatically from your selected date:</div>
+        <div style="color:#aaa;font-size:0.88em;">&#x26A1; Hash generated automatically:</div>
         <div class="hash-value" id="hash-preview-value">...</div>
-        <div style="color:#666;font-size:0.78em;margin-top:6px;">SHA-256 &mdash; this is what will be sent to the server, <em>not</em> your birthday.</div>
+        <div style="color:#666;font-size:0.78em;margin-top:6px;">SHA-256 &mdash; this is what is sent to the server.</div>
       </div>
 
-      <!-- Explanation: what is a hash? -->
+      <!-- Explanation -->
       <div class="hash-explainer">
-        <h3>&#x1F512; What just happened? &mdash; How hashing works</h3>
+        <h3>&#x1F512; How Hashing Works</h3>
         <p>
-          When you type or pick your birthday, your browser instantly runs it through a <strong>hash function</strong> (SHA-256).
-          The result is a fixed-length string of letters and numbers &mdash; the <em>hash</em>.
-          This hash is what gets sent to the server. <strong>Your actual birthday never leaves your device.</strong>
+          When you type or pick your birthday, your browser runs it through a <strong>hash function</strong> (SHA-256).
+          This creates a unique "fingerprint" (the hash) which is sent to the server. 
+          <strong>Your actual birthday never leaves your device.</strong>
         </p>
         <div class="cow-story">
           &#x1F404; Think of it like turning a cow into a burger: easy to go from cow &rarr; burger,
           but <strong>impossible to reconstruct the cow from the burger</strong>.
-          Hashing works the same way &mdash; it\'s a one-way mathematical function.
-          No matter how long you stare at the hash, you can\'t reverse-engineer the original password from it.
+          It's a one-way mathematical function.
         </div>
         <p style="margin-top:12px;">
-          <strong>But wait &mdash; birthdays are a weak password!</strong><br>
-          Because there are only ~36,500 possible birthdays in a 100-year range,
-          an attacker can simply try <em>all of them</em>, hash each one, and compare.
-          That\'s exactly what the instructor\'s dashboard does &mdash; in seconds.
-          This is called a <strong>brute-force attack</strong>, and it shows why
-          predictable passwords (like birthdays) are insecure even when "protected" by hashing.
+          <strong>Security Note:</strong> Birthdays are weak passwords because an attacker can just try <em>all possible dates</em> (~36,500), hash them, and see which one matches yours.
         </p>
       </div>
     </div>
@@ -166,82 +155,65 @@
     <button class="btn" id="submit-btn">Lock Space &amp; Submit Hash</button>
     <div id="status-msg"></div>
 
-    <!-- Transparency disclosure -->
     <div class="meta-disclosure">
       <button id="meta-toggle">What information is sent along with your hash?</button>
       <pre id="meta-panel"></pre>
     </div>
   </div>
 
-  <!-- Info Box -->
   <div class="card" style="border-color:#1a3a1a;background:#0d1a0d">
     <h2 style="color:#4a4">How This Works</h2>
     <p style="color:#aaa;line-height:1.7">
-      Your password is <strong>never sent</strong> to the server.<br><br>
-      Instead, your browser computes a <strong>SHA-256 hash</strong> of your password &mdash; a one-way fingerprint &mdash; and only the hash is transmitted.<br><br>
-      The instructor\'s dashboard will then use <strong>brute force</strong> to try all possible birthday dates and find which one matches your hash.<br>
-      This shows why predictable passwords (like birthdays) are insecure even when "protected" by hashing.
+      Your browser computes a <strong>SHA-256 hash</strong> of your password and only the hash is transmitted.<br><br>
+      The instructor's dashboard then uses <strong>brute force</strong> to try all possible birthday dates.
     </p>
   </div>
 
 </div>
 
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
 <script src="js/student.js"></script>
 <script>
 (function() {
-  var checkbox = document.getElementById('use-datepicker');
-  var wrapper  = document.getElementById('date-picker-wrapper');
-  var picker   = document.getElementById('birthday-picker');
-  var pwInput  = document.getElementById('pw-input');
-  var preview  = document.getElementById('hash-preview');
+  var pwInput = document.getElementById('pw-input');
+  var preview = document.getElementById('hash-preview');
   var previewVal = document.getElementById('hash-preview-value');
+  var trigger = document.getElementById('calendar-trigger');
 
-  // Set week start to Monday via CSS hack (supported in Chromium)
-  if (picker) {
-    picker.setAttribute('data-week-start', '1');
-  }
-
-  checkbox.addEventListener('change', function() {
-    if (checkbox.checked) {
-      wrapper.classList.add('visible');
-      if (picker.value) syncDate();
-    } else {
-      wrapper.classList.remove('visible');
-      preview.classList.remove('visible');
+  // Initialize Flatpickr (German, Monday first, year/month selection)
+  var fp = flatpickr("#hidden-picker", {
+    locale: "de",
+    dateFormat: "dmY", // This allows us to get DDMMYYYY easily
+    allowInput: false,
+    clickOpens: false,
+    position: "auto right",
+    minDate: "1900-01-01",
+    maxDate: "2020-12-31",
+    onChange: function(selectedDates, dateStr) {
+      // dateStr will be DDMMYYYY based on dateFormat "dmY"
+      pwInput.value = dateStr;
+      updateHash();
     }
   });
 
-  picker.addEventListener('change', function() {
-    if (!picker.value) return;
-    var parts = picker.value.split('-'); // YYYY-MM-DD
-    var dd = parts[2], mm = parts[1], yyyy = parts[0];
-    pwInput.value = dd + mm + yyyy;
-    syncDate();
+  trigger.addEventListener('click', function() {
+    fp.open();
   });
 
-  function syncDate() {
+  pwInput.addEventListener('input', updateHash);
+
+  async function updateHash() {
     var val = pwInput.value;
     if (val.length === 8) {
-      sha256(val).then(function(hash) {
-        previewVal.textContent = hash;
-        preview.classList.add('visible');
-      });
+      var hash = await sha256(val);
+      previewVal.textContent = hash;
+      preview.classList.add('visible');
     } else {
       preview.classList.remove('visible');
     }
   }
-
-  // Also auto-preview when typing manually in pw-input
-  pwInput.addEventListener('input', function() {
-    if (pwInput.value.length === 8) {
-      sha256(pwInput.value).then(function(hash) {
-        previewVal.textContent = hash;
-        preview.classList.add('visible');
-      });
-    } else {
-      preview.classList.remove('visible');
-    }
-  });
 
   async function sha256(message) {
     var msgBuffer = new TextEncoder().encode(message);
