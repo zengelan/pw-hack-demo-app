@@ -64,7 +64,7 @@
     }
     .fingerprint-text {
       color: #aaa;
-      font-size: 1.05em; /* Larger and more readable */
+      font-size: 1.05em;
       line-height: 1.6;
       margin-top: 12px;
       font-weight: 500;
@@ -121,7 +121,6 @@
       width: 0;
       height: 0;
     }
-    /* Fix for flatpickr scrolling/greyed out days issue */
     .flatpickr-calendar {
       background: #1a1a1a !important;
     }
@@ -133,7 +132,7 @@
 <body>
 
 <header class="app-header">
-  <img src="img/logo.png" alt="School Logo" class="logo" onerror="this.style.display='none'">
+  <img src="logo.png" alt="School Logo" class="logo" onerror="this.style.display='none'">
   <h1>Password Security Demo</h1>
 </header>
 
@@ -189,7 +188,6 @@
       This application is a security demonstration designed to show how authentication works in modern web apps — and why certain common practices are dangerous.
     </p>
 
-    <!-- Hashing Explanation moved here -->
     <div class="hash-explainer">
       <h3>&#x1F512; How Hashing Works</h3>
       <p>
@@ -243,8 +241,6 @@
     position: "auto center",
     minDate: "1900-01-01",
     maxDate: "2020-12-31",
-    // Fix for the scroll range / grey out issue
-    // Ensure the year selector is always visible and functional
     onReady: function(selectedDates, dateStr, instance) {
       const yearInput = instance.calendarContainer.querySelector('.cur-year');
       if(yearInput) yearInput.removeAttribute('readonly');
