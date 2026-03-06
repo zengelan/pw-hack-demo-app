@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Security Demo</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <img src="img/logo.png" alt="School Logo" class="logo" onerror="this.style.display='none'">
+  <h1>Password Security Demo</h1>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Select Space -->
+  <div class="card">
+    <h2>Step 1: Select a Space</h2>
+    <p style="color:#aaa;margin-bottom:12px">Choose the space you want to protect with your password.</p>
+    <select id="space-select">
+      <option value="">-- Select a space --</option>
+    </select>
+
+    <!-- Space Info -->
+    <div id="space-info"></div>
+  </div>
+
+  <!-- Step 2: Enter Password -->
+  <div id="pw-section" class="card">
+    <h2>Step 2: Enter Your Birthday as Password</h2>
+    <p style="color:#aaa;margin-bottom:12px">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998 for March 15, 1998</p>
+    <input type="text" id="pw-input" maxlength="8" placeholder="DDMMYYYY" autocomplete="off" inputmode="numeric" pattern="[0-9]{8}">
+    <button class="btn" id="submit-btn">Lock Space &amp; Submit Hash</button>
+    <div id="status-msg"></div>
+
+    <!-- Transparency disclosure -->
+    <div class="meta-disclosure">
+      <button id="meta-toggle">What information is sent along with your hash?</button>
+      <pre id="meta-panel"></pre>
+    </div>
+  </div>
+
+  <!-- Info Box -->
+  <div class="card" style="border-color:#1a3a1a;background:#0d1a0d">
+    <h2 style="color:#4a4">How This Works</h2>
+    <p style="color:#aaa;line-height:1.7">
+      Your password is <strong>never sent</strong> to the server.<br>
+      Instead, your browser computes a <strong>SHA-256 hash</strong> of your password — a one-way fingerprint — and only the hash is transmitted.<br><br>
+      The instructor's dashboard will then use <strong>brute force</strong> to try all possible birthday dates and find which one matches your hash.
+      This shows why predictable passwords (like birthdays) are insecure even when "protected" by hashing.
+    </p>
+  </div>
+
+</div>
+
+<script src="js/student.js"></script>
+
+</body>
+</html>
