@@ -18,7 +18,7 @@ async function loadSpaces() {
     const res = await fetch('/api/spaces');
     const data = await res.json();
     const sel = document.getElementById('space-select');
-    data.spaces.forEach(s => {
+    (data.spaces || []).forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.name;
@@ -36,7 +36,7 @@ async function onSpaceChange() {
   try {
     const res = await fetch('/api/spaces');
     const data = await res.json();
-    const space = data.spaces.find(s => s.id === spaceId);
+    const space = (data.spaces || []).find(s => s.id === spaceId);
     if (space) renderSpaceInfo(space);
   } catch(e) {}
   document.getElementById('pw-section').style.display = 'block';
@@ -49,8 +49,7 @@ function renderSpaceInfo(space) {
       <tr><th>Space</th><td>${space.name}</td></tr>
       <tr><th>Location</th><td>${space.location || '-'}</td></tr>
       <tr><th>Description</th><td>${space.description || '-'}</td></tr>
-    </table>
-  `;
+    </table>`;
   el.style.display = 'block';
 }
 
@@ -106,17 +105,22 @@ async function onSubmit() {
   const spaceId = document.getElementById('space-select').value;
   const pw = document.getElementById('pw-input').value.trim();
   const status = document.getElementById('status-msg');
-
-  if (!spaceId) { status.textContent = 'Please select a space first.'; return; }
-  if (!pw) { status.textContent = 'Please enter a password.'; return; }
-  if (!/^\d{8}$/.test(pw)) { status.textContent = 'Password must be 8 digits (DDMMYYYY).'; return; }
-
+  if (!spaceId) {
+    status.textContent = 'Please select a space first.';
+    return;
+  }
+  if (!pw) {
+    status.textContent = 'Please enter a password.';
+    return;
+  }
+  if (!/^\d{8}$/.test(pw)) {
+    status.textContent = 'Password must be 8 digits (DDMMYYYY).';
+    return;
+  }
   const hash = await sha256(pw);
   const meta = collectMeta();
-
   status.textContent = 'Submitting...';
   document.getElementById('submit-btn').disabled = true;
-
   try {
     const res = await fetch('/api/submit', {
       method: 'POST',
@@ -124,11 +128,10 @@ async function onSubmit() {
       body: JSON.stringify({spaceId, hash, meta})
     });
     const data = await res.json();
-
     if (res.status === 403) {
       status.innerHTML = '<span style="color:#f00">' + (data.error || 'Access denied.') + '</span><br>Your IP: ' + (data.ip || '');
     } else if (res.status === 429) {
-      status.innerHTML = '<span style="color:#f00">Maximum submissions reached. No more passwords accepted.</span>';
+      status.innerHTML = '<span style="color:#f00">' + (data.error || 'Maximum submissions reached. No more passwords accepted.') + '</span>';
     } else if (res.ok) {
       status.innerHTML = '<span style="color:#0f0">Hash submitted successfully!</span><br>Hash: <code>' + hash.substring(0,32) + '...</code>';
       document.getElementById('pw-input').value = '';
