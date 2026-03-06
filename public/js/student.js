@@ -17,13 +17,19 @@ async function loadSpaces() {
   try {
     const res = await fetch('/api/spaces');
     const data = await res.json();
+    const spaces = data.spaces || [];
     const sel = document.getElementById('space-select');
-    (data.spaces || []).forEach(s => {
+    spaces.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.name;
       sel.appendChild(opt);
     });
+    // Auto-select and auto-trigger if there is only one space
+    if (spaces.length === 1) {
+      sel.value = spaces[0].id;
+      await onSpaceChange();
+    }
   } catch(e) {
     console.error('Failed to load spaces:', e);
   }
