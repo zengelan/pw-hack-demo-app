@@ -1,0 +1,14 @@
+name            = "pw-hack-demo-app"
+main            = "src/worker.mjs"
+compatibility_date = "2026-03-06"
+
+[assets]
+directory = "./public"
+
+[[kv_namespaces]]
+binding = "HASHES"
+id      = "REPLACE_WITH_YOUR_HASHES_KV_ID"
+
+[[kv_namespaces]]
+binding = "ALLOWLIST"
+id      = "REPLACE_WITH_YOUR_ALLOWLIST_KV_ID"
