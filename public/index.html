@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Password Security Demo</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- Use flatpickr for a better cross-browser date picker with German locale -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
   <style>
@@ -44,7 +43,7 @@
     }
     .hash-preview {
       margin-top: 14px;
-      padding: 12px 14px;
+      padding: 16px;
       background: #0a0a1a;
       border: 1px solid #334;
       border-radius: 8px;
@@ -54,15 +53,18 @@
       display: block;
     }
     .hash-value {
-      font-family: monospace;
-      font-size: 0.82em;
+      font-family: 'Courier New', monospace;
+      font-size: 1.1em; /* Increased font size */
+      font-weight: bold;
       word-break: break-all;
       color: #7af;
-      margin-top: 6px;
+      margin-top: 8px;
+      letter-spacing: 0.5px;
+      line-height: 1.4;
     }
     .hash-explainer {
-      margin-top: 18px;
-      padding: 16px;
+      margin-top: 24px;
+      padding: 18px;
       border: 1px solid #3a3a1a;
       border-radius: 8px;
       background: #1a1a0a;
@@ -73,18 +75,37 @@
     .hash-explainer h3 {
       color: #dd8;
       margin-top: 0;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .cow-story {
-      margin-top: 10px;
-      padding: 12px 14px;
+      margin-top: 12px;
+      padding: 14px;
       background: #111108;
       border-left: 4px solid #aa6;
       border-radius: 4px;
       font-style: italic;
       color: #cc9;
     }
-    /* Hide the flatpickr input but keep it for the library */
+    .project-explanation {
+      margin-top: 30px;
+      padding: 20px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #111;
+      border-top: 4px solid #444;
+    }
+    .project-explanation h2 {
+      margin-top: 0;
+      color: #eee;
+    }
+    .warning-box {
+      margin-top: 15px;
+      padding: 15px;
+      background: #2a0a0a;
+      border: 1px solid #5a1a1a;
+      border-radius: 6px;
+      color: #faa;
+    }
     #hidden-picker {
       position: absolute;
       visibility: hidden;
@@ -122,32 +143,35 @@
       <button class="calendar-btn" id="calendar-trigger" title="Open Date Picker">&#x1F4C5;</button>
     </div>
     
-    <!-- Hidden input for flatpickr -->
     <input type="text" id="hidden-picker">
 
     <div class="date-picker-section">
       <!-- Live hash preview -->
       <div class="hash-preview" id="hash-preview">
-        <div style="color:#aaa;font-size:0.88em;">&#x26A1; Hash generated automatically:</div>
+        <div style="color:#aaa;font-size:0.9em;font-weight:600;">&#x26A1; SHA-256 Hash Result:</div>
         <div class="hash-value" id="hash-preview-value">...</div>
-        <div style="color:#666;font-size:0.78em;margin-top:6px;">SHA-256 &mdash; this is what is sent to the server.</div>
+        <div style="color:#666;font-size:0.8em;margin-top:10px;">
+          This 64-character string is the "fingerprint" of your password. 
+          It is the only thing sent to the server.
+        </div>
       </div>
 
-      <!-- Explanation -->
+      <!-- Explanation: How hashing works (including the cow/burger story) -->
       <div class="hash-explainer">
         <h3>&#x1F512; How Hashing Works</h3>
         <p>
           When you type or pick your birthday, your browser runs it through a <strong>hash function</strong> (SHA-256).
-          This creates a unique "fingerprint" (the hash) which is sent to the server. 
+          This creates a unique fingerprint which is sent to the server. 
           <strong>Your actual birthday never leaves your device.</strong>
         </p>
         <div class="cow-story">
-          &#x1F404; Think of it like turning a cow into a burger: easy to go from cow &rarr; burger,
-          but <strong>impossible to reconstruct the cow from the burger</strong>.
-          It's a one-way mathematical function.
+          &#x1F404; <strong>The Cow to Burger Analogy:</strong><br>
+          Think of it like turning a cow into a burger. It is easy to go from cow &rarr; burger,
+          but <strong>absolutely impossible to reconstruct the original cow from the burger</strong>.
+          Hashing is a one-way mathematical function designed exactly like this.
         </div>
         <p style="margin-top:12px;">
-          <strong>Security Note:</strong> Birthdays are weak passwords because an attacker can just try <em>all possible dates</em> (~36,500), hash them, and see which one matches yours.
+          Your password is never sent to the server. Instead, your browser computes this one-way fingerprint — and only the hash is transmitted.
         </p>
       </div>
     </div>
@@ -161,11 +185,24 @@
     </div>
   </div>
 
-  <div class="card" style="border-color:#1a3a1a;background:#0d1a0d">
-    <h2 style="color:#4a4">How This Works</h2>
-    <p style="color:#aaa;line-height:1.7">
-      Your browser computes a <strong>SHA-256 hash</strong> of your password and only the hash is transmitted.<br><br>
-      The instructor's dashboard then uses <strong>brute force</strong> to try all possible birthday dates.
+  <!-- New Project Explanation Section -->
+  <div class="project-explanation">
+    <h2>&#x1F4DA; About This Project</h2>
+    <p style="color:#bbb; line-height:1.6;">
+      This application is a security demonstration designed to show how authentication works in modern web apps — and why certain common practices are dangerous.
+    </p>
+    
+    <div class="warning-box">
+      <strong>&#x26A0; The Illusion of Safety:</strong><br>
+      Even though we use a secure <strong>SHA-256 hash</strong> (meaning the server never sees your password), this system is still extremely easy to hack. 
+      Why? Because birthdays are <strong>predictable</strong>.
+    </div>
+    
+    <p style="color:#bbb; line-height:1.6; margin-top:15px;">
+      An attacker doesn't need to "reverse" the hash. They just use a <strong>brute-force function</strong>:
+      they take every possible date in a 100-year range (~36,500 dates), hash each one, and compare them to your hash. 
+      On a modern computer, this takes <strong>less than a second</strong>. 
+      This project proves that even with strong math (hashing), a weak or predictable password makes your security irrelevant.
     </p>
   </div>
 
@@ -182,17 +219,15 @@
   var previewVal = document.getElementById('hash-preview-value');
   var trigger = document.getElementById('calendar-trigger');
 
-  // Initialize Flatpickr (German, Monday first, year/month selection)
   var fp = flatpickr("#hidden-picker", {
     locale: "de",
-    dateFormat: "dmY", // This allows us to get DDMMYYYY easily
+    dateFormat: "dmY",
     allowInput: false,
     clickOpens: false,
     position: "auto right",
     minDate: "1900-01-01",
     maxDate: "2020-12-31",
     onChange: function(selectedDates, dateStr) {
-      // dateStr will be DDMMYYYY based on dateFormat "dmY"
       pwInput.value = dateStr;
       updateHash();
     }
