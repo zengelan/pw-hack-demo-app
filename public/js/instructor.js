@@ -1,6 +1,6 @@
 // instructor.js - Instructor Dashboard Logic
 
-const POLL_INTERVAL = 3000;
+const DEFAULT_POLL_INTERVAL = 0; // Off by default
 let pollTimer = null;
 let isCracking = false;
 let crackTimer = null;
@@ -10,13 +10,38 @@ let submissions = [];
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   loadSubmissions();
-  pollTimer = setInterval(loadSubmissions, POLL_INTERVAL);
+  
+  // Wire up poll interval dropdown
+  const pollSelect = document.getElementById('poll-interval-select');
+  if (pollSelect) {
+    pollSelect.addEventListener('change', () => {
+      const val = parseInt(pollSelect.value, 10);
+      startPolling(isNaN(val) ? 0 : val);
+    });
+    // Start with default (Off)
+    startPolling(DEFAULT_POLL_INTERVAL);
+  }
+  
   document.getElementById('btn-delete-all').addEventListener('click', deleteAll);
   document.getElementById('btn-crack-all').addEventListener('click', crackAll);
   loadSpacesAdmin();
   const saveSpaceBtn = document.getElementById('btn-save-space');
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
 });
+
+// --- Polling control ---
+function startPolling(intervalMs) {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (intervalMs > 0) {
+    pollTimer = setInterval(loadSubmissions, intervalMs);
+    console.log('Polling started: every ' + (intervalMs/1000) + 's');
+  } else {
+    console.log('Polling disabled');
+  }
+}
 
 // --- Load submissions from API ---
 async function loadSubmissions() {
