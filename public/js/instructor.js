@@ -1,6 +1,6 @@
 // instructor.js - Instructor Dashboard Logic
 
-const DEFAULT_POLL_INTERVAL = 60000;
+const POLL_INTERVAL = 3000;
 let pollTimer = null;
 let isCracking = false;
 let crackTimer = null;
@@ -10,32 +10,13 @@ let submissions = [];
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   loadSubmissions();
-  startPolling(DEFAULT_POLL_INTERVAL);
+  pollTimer = setInterval(loadSubmissions, POLL_INTERVAL);
   document.getElementById('btn-delete-all').addEventListener('click', deleteAll);
   document.getElementById('btn-crack-all').addEventListener('click', crackAll);
   loadSpacesAdmin();
   const saveSpaceBtn = document.getElementById('btn-save-space');
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
-
-  const pollSelect = document.getElementById('poll-interval-select');
-  if (pollSelect) {
-    pollSelect.addEventListener('change', () => {
-      const val = parseInt(pollSelect.value, 10);
-      startPolling(isNaN(val) ? 0 : val);
-    });
-  }
 });
-
-// --- Polling control ---
-function startPolling(intervalMs) {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-  if (intervalMs > 0) {
-    pollTimer = setInterval(loadSubmissions, intervalMs);
-  }
-}
 
 // --- Load submissions from API ---
 async function loadSubmissions() {
@@ -51,6 +32,80 @@ async function loadSubmissions() {
   }
 }
 
+// --- Device type + OS from User Agent ---
+function guessDeviceType(ua) {
+  if (!ua || ua === 'unknown') return '\u2753 Unknown';
+  if (/bot|crawler|spider|headless|python|curl|wget|go-http/i.test(ua)) return '\uD83E\uDD16 Bot';
+
+  // Mobile OS
+  if (/iphone/i.test(ua))                          return '\uD83D\uDCF1 iPhone (iOS)';
+  if (/ipad/i.test(ua))                            return '\uD83D\uDCDF iPad (iOS)';
+  if (/android/i.test(ua) && /mobile/i.test(ua))  return '\uD83D\uDCF1 Android';
+  if (/android/i.test(ua))                         return '\uD83D\uDCDF Android Tablet';
+  if (/windows phone/i.test(ua))                   return '\uD83D\uDCF1 Windows Phone';
+  if (/blackberry|bb10/i.test(ua))                 return '\uD83D\uDCF1 BlackBerry';
+
+  // Desktop OS
+  if (/windows nt/i.test(ua))                      return '\uD83D\uDDA5 Desktop (Windows)';
+  if (/macintosh|mac os x/i.test(ua))              return '\uD83D\uDDA5 Desktop (macOS)';
+  if (/cros/i.test(ua))                            return '\uD83D\uDDA5 Desktop (ChromeOS)';
+  if (/linux/i.test(ua))                           return '\uD83D\uDDA5 Desktop (Linux)';
+
+  return '\uD83D\uDDA5 Desktop';
+}
+
+// --- Crack duration ---
+function formatCrackDuration(sub) {
+  if (!sub.crackedAt || !sub.submitted) return '';
+  const ms = sub.crackedAt - sub.submitted;
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+// --- JSON syntax highlighter (VS Code dark theme colors) ---
+function syntaxHighlightJson(obj) {
+  const json = JSON.stringify(obj, null, 2)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return json.replace(
+    /(&quot;(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\&])*&quot;(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    function(match) {
+      var cls = 'color:#ce9178'; // string value
+      if (/^&quot;/.test(match)) {
+        if (/:$/.test(match)) cls = 'color:#9cdcfe'; // key
+      } else if (/true|false/.test(match)) {
+        cls = 'color:#569cd6'; // boolean
+      } else if (/null/.test(match)) {
+        cls = 'color:#808080'; // null
+      } else {
+        cls = 'color:#b5cea8'; // number
+      }
+      return '<span style="' + cls + '">' + match + '</span>';
+    }
+  );
+}
+
+// --- Show metadata modal ---
+function showMeta(sub) {
+  const payload = {
+    id:        sub.id,
+    hash:      sub.hash,
+    spaceId:   sub.spaceId,
+    submitted: sub.submitted ? new Date(sub.submitted).toISOString() : null,
+    cracked:   sub.cracked,
+    password:  sub.password || null,
+    crackedAt: sub.crackedAt ? new Date(sub.crackedAt).toISOString() : null,
+    attempts:  sub.attempts,
+    meta:      sub.meta || {}
+  };
+  document.getElementById('meta-modal-body').innerHTML =
+    '<pre style="margin:0;padding:1em;background:#0d1117;border-radius:6px;' +
+    'font-family:\'Fira Code\',\'Cascadia Code\',\'Consolas\',monospace;' +
+    'font-size:0.82em;line-height:1.6;overflow:auto;max-height:65vh;' +
+    'color:#d4d4d4;white-space:pre;tab-size:2">' +
+    syntaxHighlightJson(payload) + '</pre>';
+  document.getElementById('meta-modal').style.display = 'block';
+}
+
 // --- Render table ---
 function renderTable(subs) {
   const tbody = document.getElementById('submissions-tbody');
@@ -60,23 +115,31 @@ function renderTable(subs) {
     return;
   }
   subs.forEach((s, i) => {
+    const cracked = s.cracked && s.password;
+    const dur = cracked ? formatCrackDuration(s) : '';
     const tr = document.createElement('tr');
     tr.id = 'row-' + s.id;
-    tr.innerHTML = `
-      <td>${i + 1}</td>
-      <td title="${s.hash}">${s.hash.substring(0, 16)}...</td>
-      <td id="crack-${s.id}">${s.cracked ? (s.password || '-') : '-'}</td>
-      <td>${s.meta?.country || '-'}</td>
-      <td>${s.meta?.ip || '-'}</td>
-      <td>${s.meta?.userAgent ? s.meta.userAgent.substring(0, 30) + '...' : '-'}</td>
-      <td>${s.submitted ? new Date(s.submitted).toLocaleTimeString() : '-'}</td>
-      <td>
-        <button class="btn-sm btn-danger" data-action="delete" data-id="${s.id}">X</button>
-        <button class="btn-sm btn-crack" data-action="crack" data-id="${s.id}">Crack</button>
-      </td>
-    `;
+    tr.style.background = cracked ? 'rgba(0,180,80,0.08)' : (i % 2 === 0 ? '#12121f' : '#0d0d1a');
+    const crackedCell = cracked
+      ? '\u2705 <strong>' + s.password + '</strong>' +
+        (dur ? '<br><span style="font-size:0.75em;color:#888;font-weight:normal">cracked in ' + dur + '</span>' : '')
+      : '<span style="color:#555">\u2014</span>';
+    tr.innerHTML =
+      '<td style="text-align:center;color:#666;font-size:0.85em">' + (i + 1) + '</td>' +
+      '<td><code title="' + s.hash + '" style="font-size:0.8em;cursor:help;color:#aaa">' + s.hash.substring(0, 12) + '\u2026</code></td>' +
+      '<td id="crack-' + s.id + '" style="font-weight:bold;color:' + (cracked ? '#4cff80' : '#555') + '">' + crackedCell + '</td>' +
+      '<td style="font-size:0.88em">' + guessDeviceType(s.meta && s.meta.userAgent) + '</td>' +
+      '<td style="font-family:monospace;font-size:0.82em;color:#aaa">' + ((s.meta && s.meta.ip) || '\u2014') + '</td>' +
+      '<td style="font-size:0.85em;color:#aaa">' + (s.spaceId || '\u2014') + '</td>' +
+      '<td style="font-size:0.82em;color:#777">' + (s.submitted ? new Date(s.submitted).toLocaleTimeString() : '\u2014') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-sm btn-crack" data-action="crack" data-id="' + s.id + '" title="Crack this hash">\u26A1</button> ' +
+        '<button class="btn-sm btn-info"  data-action="info"  data-id="' + s.id + '" title="Show all metadata">\uD83D\uDD0D</button> ' +
+        '<button class="btn-sm btn-danger" data-action="delete" data-id="' + s.id + '" title="Delete">\u2715</button>' +
+      '</td>';
     tbody.appendChild(tr);
   });
+
   tbody.onclick = (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
@@ -85,7 +148,8 @@ function renderTable(subs) {
     if (!sub) return;
     const action = btn.getAttribute('data-action');
     if (action === 'delete') deleteSingle(id);
-    if (action === 'crack') crackSingle(id, sub.hash);
+    if (action === 'crack')  crackSingle(id, sub.hash);
+    if (action === 'info')   showMeta(sub);
   };
 }
 
@@ -106,13 +170,15 @@ async function deleteAll() {
 function crackSingle(id, hash) {
   const cell = document.getElementById('crack-' + id);
   if (!cell) return;
-  cell.textContent = 'Cracking...';
+  cell.textContent = 'Cracking\u2026';
+  cell.style.color = '#888';
   bruteForce(hash, (pwd, attempts, ms) => {
     if (pwd) {
-      cell.textContent = pwd + ' (' + attempts.toLocaleString() + ' attempts, ' + ms + 'ms)';
-      cell.style.color = '#f00';
+      cell.innerHTML = '\u2705 <strong>' + pwd + '</strong>' +
+        '<br><span style="font-size:0.75em;color:#888;font-weight:normal">' +
+        attempts.toLocaleString() + ' attempts, ' + ms + 'ms</span>';
+      cell.style.color = '#4cff80';
       playSound('win');
-      // Update the hash entry on the server
       fetch('/api/hash/' + id, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -120,6 +186,7 @@ function crackSingle(id, hash) {
       });
     } else {
       cell.textContent = 'Not found';
+      cell.style.color = '#f66';
       playSound('fail');
     }
   });
@@ -142,11 +209,14 @@ function crackNext() {
   currentCrackIndex++;
   const cell = document.getElementById('crack-' + s.id);
   if (!cell) { crackNext(); return; }
-  cell.textContent = 'Cracking...';
+  cell.textContent = 'Cracking\u2026';
+  cell.style.color = '#888';
   bruteForce(s.hash, (pwd, attempts, ms) => {
     if (pwd) {
-      cell.textContent = pwd + ' (' + attempts.toLocaleString() + ' att, ' + ms + 'ms)';
-      cell.style.color = '#f00';
+      cell.innerHTML = '\u2705 <strong>' + pwd + '</strong>' +
+        '<br><span style="font-size:0.75em;color:#888;font-weight:normal">' +
+        attempts.toLocaleString() + ' attempts, ' + ms + 'ms</span>';
+      cell.style.color = '#4cff80';
       fetch('/api/hash/' + s.id, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -154,6 +224,7 @@ function crackNext() {
       });
     } else {
       cell.textContent = 'Not found';
+      cell.style.color = '#f66';
     }
     setTimeout(crackNext, 200);
   });
@@ -213,13 +284,12 @@ async function loadSpacesAdmin() {
     }
     spaces.forEach(s => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${s.id}</td>
-        <td>${s.name}</td>
-        <td>${s.location || '-'}</td>
-        <td>${s.description || '-'}</td>
-        <td><button class="btn-sm btn-danger" data-spaceid="${s.id}">Delete</button></td>
-      `;
+      tr.innerHTML =
+        '<td>' + s.id + '</td>' +
+        '<td>' + s.name + '</td>' +
+        '<td>' + (s.location || '-') + '</td>' +
+        '<td>' + (s.description || '-') + '</td>' +
+        '<td><button class="btn-sm btn-danger" data-spaceid="' + s.id + '">Delete</button></td>';
       tbody.appendChild(tr);
     });
     tbody.onclick = async (e) => {
