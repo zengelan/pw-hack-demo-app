@@ -1,8 +1,27 @@
-const MAX_HASHES=25,RATE_LIMIT_MS=30000,HASHES_CACHE_TTL=5000;
+const MAX_HASHES=25,RATE_LIMIT_MS=30000,HASHES_CACHE_TTL=5000,INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 function json(d,s=200){return new Response(JSON.stringify(d),{status:s,headers:{"Content-Type":"application/json",...CORS}});}
 function esc(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").slice(0,40);}
 let _ac=null,_at=0,_hc=null,_ht=0;
+
+// --- Index management (replaces KV list() calls) ---
+async function getIndex(env){
+  const raw=await env.PWDEMOAPPHASHES.get(INDEX_KEY);
+  if(!raw)return[];
+  try{const ids=JSON.parse(raw);return Array.isArray(ids)?ids.filter(id=>!id.startsWith("rl:")):[]; }catch{return[];}
+}
+async function saveIndex(env,ids){
+  await env.PWDEMOAPPHASHES.put(INDEX_KEY,JSON.stringify(ids),{expirationTtl:7200});
+}
+async function addToIndex(env,id){
+  const idx=await getIndex(env);
+  if(!idx.includes(id)){idx.push(id);await saveIndex(env,idx);}
+}
+async function removeFromIndex(env,id){
+  const idx=await getIndex(env);
+  const filtered=idx.filter(x=>x!==id);
+  if(filtered.length!==idx.length)await saveIndex(env,filtered);
+}
 
 // --- Allowlist ---
 async function getRules(env){
@@ -82,9 +101,8 @@ async function submit(req,env){
   if(!await allowed(req,env)){const cf=req.cf??{},ip=req.headers.get("CF-Connecting-IP")??"unknown";return json({error:"Submissions from this IP are blocked.",ip,country:cf.country??"unknown",asn:cf.asn??"unknown",asOrganization:cf.asOrganization??"unknown",hint:"Ask your instructor to add your IP to the allowlist."},403);}
   const ip=req.headers.get("CF-Connecting-IP")??"unknown";
   if(await rateLimited(ip,env))return json({error:"Please wait 30 seconds between submissions."},429);
-  const{keys}=await env.PWDEMOAPPHASHES.list({limit:200});
-  const real=keys.filter(k=>!k.name.startsWith("rl:"));
-  if(real.length>=MAX_HASHES)return json({error:"Demo full. Max 25 submissions reached."},429);
+  const idx=await getIndex(env);
+  if(idx.length>=MAX_HASHES)return json({error:"Demo full. Max 25 submissions reached."},429);
   const body=await req.json().catch(()=>null);
   if(!body?.hash||!body?.spaceId)return json({error:"Missing fields: hash and spaceId required."},400);
   if(!/^[a-f0-9]{64}$/i.test(body.hash))return json({error:"Invalid hash. Expected SHA-256 hex."},400);
@@ -93,14 +111,14 @@ async function submit(req,env){
   const cf=req.cf??{},id=crypto.randomUUID();
   const entry={id,hash:body.hash,spaceId:body.spaceId,submitted:Date.now(),cracked:false,attempts:0,password:null,crackedAt:null,meta:{ip,country:cf.country??"unknown",city:cf.city??"unknown",region:cf.region??"unknown",postalCode:cf.postalCode??"unknown",latitude:cf.latitude??"unknown",longitude:cf.longitude??"unknown",asn:cf.asn??"unknown",asOrganization:cf.asOrganization??"unknown",timezone:cf.timezone??"unknown",colo:cf.colo??"unknown",httpProtocol:cf.httpProtocol??"unknown",tlsVersion:cf.tlsVersion??"unknown",tlsCipher:cf.tlsCipher??"unknown",userAgent:req.headers.get("User-Agent")??"unknown",acceptLanguage:req.headers.get("Accept-Language")??"unknown",referer:req.headers.get("Referer")??"none",rayId:req.headers.get("Cf-Ray")??"unknown",client:body.meta??{}}};
   await env.PWDEMOAPPHASHES.put(id,JSON.stringify(entry),{expirationTtl:7200});
-  return json({id,success:true,slotsLeft:MAX_HASHES-(real.length+1)});
+  await addToIndex(env,id);
+  return json({id,success:true,slotsLeft:MAX_HASHES-(idx.length+1)});
 }
 async function hashes(env){
   const now=Date.now();
   if(_hc&&(now-_ht)<HASHES_CACHE_TTL)return json(_hc);
-  const{keys}=await env.PWDEMOAPPHASHES.list({limit:100});
-  const real=keys.filter(k=>!k.name.startsWith("rl:"));
-  const rows=await Promise.all(real.slice(0,MAX_HASHES).map(k=>env.PWDEMOAPPHASHES.get(k.name,{type:"json"})));
+  const idx=await getIndex(env);
+  const rows=await Promise.all(idx.slice(0,MAX_HASHES).map(id=>env.PWDEMOAPPHASHES.get(id,{type:"json"})));
   _hc=rows.filter(Boolean);_ht=now;
   return json(_hc);
 }
@@ -111,12 +129,18 @@ async function updateHash(req,env,id){
   await env.PWDEMOAPPHASHES.put(id,JSON.stringify({...e,cracked:true,password:esc(b.password??""),attempts:b.attempts??0,crackedAt:Date.now()}),{expirationTtl:7200});
   return json({success:true});
 }
-async function deleteHash(env,id){_hc=null;_ht=0;await env.PWDEMOAPPHASHES.delete(id);return json({success:true});}
+async function deleteHash(env,id){
+  _hc=null;_ht=0;
+  await env.PWDEMOAPPHASHES.delete(id);
+  await removeFromIndex(env,id);
+  return json({success:true});
+}
 async function clear(env){
   _hc=null;_ht=0;
-  let cursor,count=0;
-  do{const r=await env.PWDEMOAPPHASHES.list({limit:100,cursor});await Promise.all(r.keys.map(k=>env.PWDEMOAPPHASHES.delete(k.name)));count+=r.keys.length;if(r.list_complete)break;cursor=r.cursor;}while(true);
-  return json({cleared:count});
+  const idx=await getIndex(env);
+  await Promise.all(idx.map(id=>env.PWDEMOAPPHASHES.delete(id)));
+  await env.PWDEMOAPPHASHES.delete(INDEX_KEY);
+  return json({cleared:idx.length});
 }
 async function getAllowlist(env){return json({rules:await env.PWDEMOAPPALLOWLIST.get("rules")??""});}
 async function updateAllowlist(req,env){
