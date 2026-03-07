@@ -94,11 +94,11 @@
   <div class="card" style="text-align:center">
     <h2>App Deployment QR Code</h2>
     <p style="color:#aaa;font-size:0.9em">Share this QR code with students to access the demo app. Click to enlarge.</p>
-    <img id="qrcode" src="qr.png" alt="QR Code for https://pw-hack-demo-app.andreas-zengel.workers.dev"
-         style="cursor:pointer;border:4px solid #444;border-radius:8px;max-width:220px;height:auto"
-         title="Click to open full-size QR in new tab">
+    <div id="qrcode-container"
+         style="display:inline-block;cursor:pointer;border:4px solid #444;border-radius:8px;padding:8px;background:#fff"
+         title="Click to open full-size QR in new tab"></div>
     <p style="color:#aaa;font-size:0.85em;margin-top:0.5em">&#128269; Click QR code to open full-size in new tab</p>
-    <p><a href="https://pw-hack-demo-app.andreas-zengel.workers.dev" target="_blank" style="color:#4fc3f7">https://pw-hack-demo-app.andreas-zengel.workers.dev</a></p>
+    <p><a href="https://pw-hack-demo.apps.zengel.cloud" target="_blank" style="color:#4fc3f7">https://pw-hack-demo.apps.zengel.cloud</a></p>
   </div>
 
   <!-- IP / Country / ASN Allowlist -->
@@ -108,6 +108,18 @@
     <textarea id="allowlist-editor" rows="8" style="width:100%;background:#0d1117;color:#eee;border:1px solid #444;padding:0.5em;font-family:monospace"></textarea>
     <button class="btn btn-success" onclick="saveAllowlist()">Save Allowlist</button>
     <span id="allowlist-status" style="margin-left:1em"></span>
+  </div>
+
+  <!-- Additional Information -->
+  <div class="card">
+    <h2>&#128196; Additional Information</h2>
+    <p style="color:#aaa;font-size:0.9em">Historical deployment information and notes collected over time.</p>
+    <ul style="color:#ccc;line-height:2;font-size:0.95em">
+      <li><strong>Previous URL (workers.dev, 2026-03-07):</strong>
+        <a href="https://pw-hack-demo-app.andreas-zengel.workers.dev" target="_blank"
+           style="color:#888;text-decoration:line-through">https://pw-hack-demo-app.andreas-zengel.workers.dev</a>
+      </li>
+    </ul>
   </div>
 
 </div>
@@ -122,8 +134,38 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="js/instructor.js"></script>
 <script>
+  const APP_URL = "https://pw-hack-demo.apps.zengel.cloud";
+
+  // Generate QR code dynamically
+  new QRCode(document.getElementById("qrcode-container"), {
+    text: APP_URL,
+    width: 220,
+    height: 220,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  // QR Code click to enlarge in new tab
+  document.getElementById("qrcode-container").addEventListener("click", function() {
+    const win = window.open("", "_blank");
+    win.document.write('<!DOCTYPE html><html><head><title>QR Code - ' + APP_URL + '</title>'
+      + '<style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      + 'height:100vh;background:#1a1a2e;color:#eee;font-family:sans-serif}'
+      + '#qr-large{border:8px solid #444;border-radius:12px;padding:16px;background:#fff}'
+      + 'p{margin-top:1em;font-size:1.1em}a{color:#4fc3f7}</style>'
+      + '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>'
+      + '</head><body>'
+      + '<div id="qr-large"></div>'
+      + '<p><a href="' + APP_URL + '" target="_blank">' + APP_URL + '</a></p>'
+      + '<script>new QRCode(document.getElementById("qr-large"),{text:"' + APP_URL + '",width:600,height:600,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});<\/script>'
+      + '</body></html>');
+    win.document.close();
+  });
+
   // Allowlist editor functions
   async function loadAllowlist() {
     try {
@@ -161,21 +203,6 @@
   // Close modal on backdrop click
   document.getElementById('meta-modal').addEventListener('click', function(e) {
     if (e.target === this) this.style.display = 'none';
-  });
-
-  // QR Code click to enlarge in new tab
-  document.getElementById('qrcode').addEventListener('click', function() {
-    const win = window.open('', '_blank');
-    win.document.write('<!DOCTYPE html><html><head><title>QR Code - https://pw-hack-demo-app.andreas-zengel.workers.dev</title>'
-      + '<style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;'
-      + 'height:100vh;background:#1a1a2e;color:#eee;font-family:sans-serif}'
-      + 'img{border:8px solid #444;border-radius:12px;max-width:90vw;height:auto}'
-      + 'p{margin-top:1em;font-size:1.1em}a{color:#4fc3f7}</style>'
-      + '</head><body>'
-      + '<img src="qr.png" alt="QR Code" style="width:600px">'
-      + '<p><a href="https://pw-hack-demo-app.andreas-zengel.workers.dev" target="_blank">https://pw-hack-demo-app.andreas-zengel.workers.dev</a></p>'
-      + '</body></html>');
-    win.document.close();
   });
 </script>
 
