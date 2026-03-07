@@ -18,7 +18,16 @@
   <!-- Stats Bar -->
   <div class="stats-bar">
     <div class="stat">Submissions: <span id="sub-count">0</span> / 25</div>
-    <div class="stat">Auto-refresh: <span>3s</span></div>
+    <div class="stat" style="display:flex;align-items:center;gap:6px;white-space:nowrap">
+      Auto-refresh:
+      <select id="poll-interval-select" style="background:#1a1a2e;color:#eee;border:1px solid #444;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.95em;width:52px;text-align:center;appearance:none;-webkit-appearance:none;-moz-appearance:none;padding-right:4px">
+        <option value="3000">3s</option>
+        <option value="10000">10s</option>
+        <option value="30000">30s</option>
+        <option value="60000" selected>60s</option>
+        <option value="0">Off</option>
+      </select>
+    </div>
     <button class="btn btn-success" id="btn-crack-all">Crack All</button>
     <button class="btn btn-danger" id="btn-delete-all">Delete All</button>
   </div>
