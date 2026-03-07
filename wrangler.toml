@@ -13,3 +13,8 @@ id      = "31d012e28d2245aa8ca5d8a393bad836"
 [[kv_namespaces]]
 binding = "PWDEMOAPPALLOWLIST"
 id      = "c09a6c44a5364cac8872a3d316711a3d"
+
+[observability]
+[observability.logs]
+enabled = false
+invocation_logs = true
