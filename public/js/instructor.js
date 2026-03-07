@@ -1,6 +1,6 @@
 // instructor.js - Instructor Dashboard Logic
 
-const POLL_INTERVAL = 3000;
+const DEFAULT_POLL_INTERVAL = 60000;
 let pollTimer = null;
 let isCracking = false;
 let crackTimer = null;
@@ -10,13 +10,32 @@ let submissions = [];
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   loadSubmissions();
-  pollTimer = setInterval(loadSubmissions, POLL_INTERVAL);
+  startPolling(DEFAULT_POLL_INTERVAL);
   document.getElementById('btn-delete-all').addEventListener('click', deleteAll);
   document.getElementById('btn-crack-all').addEventListener('click', crackAll);
   loadSpacesAdmin();
   const saveSpaceBtn = document.getElementById('btn-save-space');
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
+
+  const pollSelect = document.getElementById('poll-interval-select');
+  if (pollSelect) {
+    pollSelect.addEventListener('change', () => {
+      const val = parseInt(pollSelect.value, 10);
+      startPolling(isNaN(val) ? 0 : val);
+    });
+  }
 });
+
+// --- Polling control ---
+function startPolling(intervalMs) {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (intervalMs > 0) {
+    pollTimer = setInterval(loadSubmissions, intervalMs);
+  }
+}
 
 // --- Load submissions from API ---
 async function loadSubmissions() {
