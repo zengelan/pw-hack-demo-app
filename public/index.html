@@ -127,6 +127,125 @@
     .flatpickr-day.flatpickr-disabled {
       color: #444 !important;
     }
+
+    /* Password Space Analysis */
+    .password-space-analysis {
+      margin-top: 30px;
+      padding: 24px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #0f0f0f;
+      border-top: 4px solid #555;
+    }
+    .password-space-analysis h2 {
+      margin-top: 0;
+      color: #eee;
+    }
+    .table-container {
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+    .password-space-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .password-space-table thead {
+      background: #2a2a2a;
+    }
+    .password-space-table th {
+      padding: 12px 10px;
+      text-align: left;
+      color: #eee;
+      font-weight: 600;
+      border-bottom: 2px solid #444;
+    }
+    .password-space-table td {
+      padding: 10px;
+      border-bottom: 1px solid #2a2a2a;
+      color: #ccc;
+    }
+    .password-space-table tbody tr:hover {
+      background: #252525;
+    }
+    .digit-count {
+      font-size: 0.85em;
+      color: #888;
+      font-style: italic;
+    }
+    .danger-extreme {
+      background: #2a0a0a !important;
+    }
+    .danger-extreme:hover {
+      background: #3a1a1a !important;
+    }
+    .danger-high {
+      background: #2a1500 !important;
+    }
+    .danger-high:hover {
+      background: #3a2510 !important;
+    }
+    .danger-medium {
+      background: #2a2000 !important;
+    }
+    .danger-medium:hover {
+      background: #3a3010 !important;
+    }
+    .danger-low {
+      background: #1a1a00 !important;
+    }
+    .danger-low:hover {
+      background: #2a2a10 !important;
+    }
+    .warning {
+      background: #1a1a0a !important;
+    }
+    .warning:hover {
+      background: #2a2a1a !important;
+    }
+    .safe {
+      background: #0a1a0a !important;
+    }
+    .safe:hover {
+      background: #1a2a1a !important;
+    }
+    .gpu-link {
+      color: #76b900;
+      text-decoration: none;
+      font-weight: 600;
+      position: relative;
+      border-bottom: 1px dotted #76b900;
+    }
+    .gpu-link:hover {
+      color: #a0e000;
+    }
+    .gpu-link:hover .gpu-tooltip {
+      display: block;
+    }
+    .gpu-tooltip {
+      display: none;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 100%;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #000;
+      border: 2px solid #76b900;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .gpu-image {
+      display: block;
+      width: 320px;
+      height: auto;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -222,6 +341,118 @@
       On a modern computer, this takes <strong>less than a second</strong>. 
       This project proves that even with strong math (hashing), a weak or predictable password makes your security irrelevant.
     </p>
+  </div>
+
+  <!-- Password Character Space Analysis -->
+  <div class="password-space-analysis">
+    <h2>&#x1F522; Password Character Space &amp; Brute Force Times</h2>
+    <p style="color:#bbb; line-height:1.6; margin-bottom:16px;">
+      The <strong>character space</strong> of a password is the total number of possible combinations an attacker must try 
+      to guarantee cracking it. This table shows various password types ranked by strength (weakest &rarr; strongest), 
+      the size of their character space, and how long a brute-force attack would take using two different methods:
+    </p>
+    
+    <ul style="color:#bbb; line-height:1.8; margin-bottom:20px;">
+      <li><strong>Browser (1M hashes/sec):</strong> Using JavaScript in a web browser (SHA-256 via WebCrypto API)</li>
+      <li><strong><a href="https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/" 
+          class="gpu-link" target="_blank" rel="noopener">GPU RTX 4090<span class="gpu-tooltip">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png/400px-NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png" 
+                 alt="NVIDIA RTX 4090" class="gpu-image">
+          </span></a> (22B hashes/sec):</strong> 
+          Using a consumer GPU with hashcat for password cracking
+      </li>
+    </ul>
+
+    <div class="table-container">
+      <table class="password-space-table">
+        <thead>
+          <tr>
+            <th>Password Type</th>
+            <th>Character Set</th>
+            <th>Formula</th>
+            <th>Combinations<br>(Digit Count)</th>
+            <th>Browser<br>(1M/s)</th>
+            <th>GPU RTX 4090<br>(22B/s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="danger-extreme">
+            <td>4-digit PIN</td>
+            <td>Digits 0–9</td>
+            <td>10<sup>4</sup></td>
+            <td>10,000<br><span class="digit-count">(5 digits)</span></td>
+            <td>~10 ms</td>
+            <td>Instant</td>
+          </tr>
+          <tr class="danger-extreme">
+            <td>8-digit birthday (DDMMYYYY)</td>
+            <td>Valid calendar dates</td>
+            <td>~36,525 dates</td>
+            <td>36,525<br><span class="digit-count">(5 digits)</span></td>
+            <td>~37 ms</td>
+            <td>Instant</td>
+          </tr>
+          <tr class="danger-high">
+            <td>6-digit number</td>
+            <td>Digits 0–9</td>
+            <td>10<sup>6</sup></td>
+            <td>~1.00 × 10<sup>6</sup><br><span class="digit-count">(7 digits)</span></td>
+            <td>~1 second</td>
+            <td>Instant</td>
+          </tr>
+          <tr class="danger-medium">
+            <td>8-char lowercase only</td>
+            <td>a–z (26 chars)</td>
+            <td>26<sup>8</sup></td>
+            <td>~2.09 × 10<sup>11</sup><br><span class="digit-count">(12 digits)</span></td>
+            <td>~2.4 days</td>
+            <td>~9.5 seconds</td>
+          </tr>
+          <tr class="danger-low">
+            <td>8-char alphanumeric</td>
+            <td>a–z, A–Z, 0–9 (62)</td>
+            <td>62<sup>8</sup></td>
+            <td>~2.18 × 10<sup>14</sup><br><span class="digit-count">(15 digits)</span></td>
+            <td>~6.9 years</td>
+            <td>~2.8 hours</td>
+          </tr>
+          <tr class="warning">
+            <td>8-char + special chars</td>
+            <td>94 printable ASCII</td>
+            <td>94<sup>8</sup></td>
+            <td>~6.10 × 10<sup>15</sup><br><span class="digit-count">(16 digits)</span></td>
+            <td>~193 years</td>
+            <td>~3.2 days</td>
+          </tr>
+          <tr class="safe">
+            <td>12-char alphanumeric</td>
+            <td>a–z, A–Z, 0–9 (62)</td>
+            <td>62<sup>12</sup></td>
+            <td>~3.23 × 10<sup>21</sup><br><span class="digit-count">(22 digits)</span></td>
+            <td>~102 million years</td>
+            <td>~4,647 years</td>
+          </tr>
+          <tr class="safe">
+            <td>12-char + special chars</td>
+            <td>94 printable ASCII</td>
+            <td>94<sup>12</sup></td>
+            <td>~4.76 × 10<sup>23</sup><br><span class="digit-count">(24 digits)</span></td>
+            <td>~15.1 billion years</td>
+            <td>~685,500 years</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:24px; padding:18px; background:#1a1a0a; border:1px solid #3a3a1a; border-radius:8px;">
+      <h3 style="color:#dd8; margin-top:0;">&#x1F4A1; Key Takeaways</h3>
+      <ul style="color:#bba; line-height:1.8; margin:8px 0; padding-left:20px;">
+        <li><strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser</li>
+        <li><strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)</li>
+        <li><strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU</li>
+        <li><strong>This assumes NO salting</strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords</li>
+      </ul>
+    </div>
   </div>
 
 </div>
