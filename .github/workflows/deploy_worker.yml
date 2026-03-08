@@ -10,11 +10,11 @@
 name: Deploy Backend to Cloudflare Workers
 
 on:
-  # CURRENT MODE: Deploy on every push that changes worker.mjs
+  # CURRENT MODE: Deploy on every push that changes src/worker.mjs
   # This ensures the latest backend code is always deployed automatically
   push:
     paths:
-      - 'worker.mjs'
+      - 'src/worker.mjs'
 
 # ALTERNATIVE MODE: Deploy only on releases/tags
 # To switch modes:
