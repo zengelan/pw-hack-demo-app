@@ -212,18 +212,22 @@
   <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: v0.0.1 &nbsp;|&nbsp; backend: …</span>
 </footer>
 <script>
-(function() {
-  fetch('/api/version')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var el = document.getElementById('version-footer');
-      if(el) el.textContent = 'ui: v0.0.1  |  backend: ' + (d.version || '?');
-    })
-    .catch(function(){
-      var el = document.getElementById('version-footer');
-      if(el) el.textContent = 'ui: v0.0.1  |  backend: unavailable';
-    });
-})();
+  Promise.all([
+    fetch('/build-info.json', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    fetch('/api/version').then(r => r.json()).catch(() => null)
+  ]).then(([ui, backend]) => {
+    const el = document.getElementById('version-footer');
+    if (!el) return;
+    const uiBranch  = ui?.branch  ?? '?';
+    const uiCommit  = ui?.commit  ?? '?';
+    const uiBuilt   = ui?.builtAt ? new Date(ui.builtAt).toLocaleString() : '?';
+    const beVersion = backend?.version ?? 'unavailable';
+    const beBranch  = backend?.branch  ?? '';
+    el.innerHTML =
+            `🖥 UI: <strong>${uiBranch}</strong> @ <code>${uiCommit}</code> (${uiBuilt})` +
+            `&nbsp;&nbsp;⚙️ Backend: <strong>${beVersion}</strong>${beBranch ? ' / ' + beBranch : ''}`;
+  });
 </script>
+
 </body>
 </html>
