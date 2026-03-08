@@ -29,6 +29,7 @@
       </select>
     </div>
     <button class="btn btn-success" id="btn-crack-all">Crack All</button>
+    <button class="btn btn-danger" id="btn-stop-crack" style="background:#ff6600;display:none">Stop Cracking</button>
     <button class="btn btn-danger" id="btn-delete-all">Delete All</button>
   </div>
 
@@ -135,6 +136,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Load modules in dependency order -->
+<script src="js/password-spaces.js"></script>
+<script src="js/dictionary-loader.js"></script>
+<script src="js/worker-pool.js"></script>
 <script src="js/instructor.js"></script>
 <script>
   const APP_URL = "https://pw-hack-demo.apps.zengel.cloud";
@@ -164,6 +169,25 @@
       + '<script>new QRCode(document.getElementById("qr-large"),{text:"' + APP_URL + '",width:600,height:600,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});<\/script>'
       + '</body></html>');
     win.document.close();
+  });
+
+  // Stop button wiring
+  document.getElementById('btn-stop-crack').addEventListener('click', function() {
+    if (confirm('Stop all active cracking operations?')) {
+      workerPool.cancel();
+      crackingState.active = false;
+      crackingState.currentId = null;
+      crackingState.batchMode = false;
+      this.style.display = 'none';
+      document.getElementById('btn-crack-all').disabled = false;
+    }
+  });
+
+  // Show/hide stop button based on cracking state
+  const originalCrackAll = document.getElementById('btn-crack-all').onclick;
+  document.getElementById('btn-crack-all').addEventListener('click', function() {
+    document.getElementById('btn-stop-crack').style.display = 'inline-block';
+    this.disabled = true;
   });
 
   // Allowlist editor functions
