@@ -313,6 +313,80 @@ function passwordTypes() {
   return json({ types: PASSWORD_TYPES });
 }
 
+// --- GPU Export ---
+async function exportGpuScript(req, env) {
+  const body = await req.json().catch(() => null);
+  if (!body || !Array.isArray(body.remainingHashes)) {
+    return json({error: 'Missing remainingHashes array'}, 400);
+  }
+  
+  const { remainingHashes, exportMetadata } = body;
+  
+  // Fetch full hash details from KV
+  const hashDetails = await Promise.all(
+    remainingHashes.map(async (hashId) => {
+      const value = await KV_HASHES.get(hashId);
+      return value ? JSON.parse(value) : null;
+    })
+  );
+  
+  const validHashes = hashDetails.filter(Boolean);
+  
+  if (validHashes.length === 0) {
+    return json({error: 'No valid hashes to export'}, 400);
+  }
+  
+  // Generate export ID and timestamp
+  const exportId = crypto.randomUUID();
+  const exportTimestamp = new Date().toISOString();
+  
+  // Prepare export metadata
+  const metadata = {
+    exportId,
+    exportTimestamp,
+    instructorSession: exportMetadata?.instructorSession || 'unknown',
+    totalSubmissions: exportMetadata?.totalSubmissions || 0,
+    crackedCount: exportMetadata?.crackedCount || 0,
+    remainingCount: validHashes.length,
+    browserAttempts: exportMetadata?.browserAttempts || 0,
+    browserDurationMs: exportMetadata?.browserDurationMs || 0,
+    stoppedReason: exportMetadata?.stoppedReason || 'user_stop'
+  };
+  
+  // Load template
+  const templateUrl = new URL('/python-templates/gpu-cracker-template.py', req.url);
+  let template;
+  
+  try {
+    const res = await fetch(templateUrl.toString());
+    if (!res.ok) throw new Error(`Template fetch failed: ${res.status}`);
+    template = await res.text();
+  } catch (e) {
+    console.error('Failed to load template:', e);
+    return json({error: 'Failed to load template'}, 500);
+  }
+  
+  // Get server URL
+  const serverUrl = new URL(req.url).origin;
+  
+  // Inject data into template
+  const script = template
+    .replace('{{HASHES_JSON}}', JSON.stringify(validHashes, null, 2))
+    .replace('{{PASSWORD_TYPES_JSON}}', JSON.stringify(PASSWORD_TYPES, null, 2))
+    .replace('{{EXPORT_METADATA_JSON}}', JSON.stringify(metadata, null, 2))
+    .replace('{{SERVER_URL}}', serverUrl);
+  
+  // Return as downloadable file
+  return new Response(script, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/x-python',
+      'Content-Disposition': `attachment; filename="gpu-cracker-${exportId.substring(0, 8)}.py"`,
+      ...CORS
+    }
+  });
+}
+
 // --- Version ---
 function version(env) {
   const v = env?.APP_VERSION ?? "dev";
@@ -466,6 +540,7 @@ export default {
     if (p === "/api/allowlist"      && req.method === "POST")   return updateAllowlist(req);
     if (p === "/api/spaces"         && req.method === "GET")    return listSpaces();
     if (p === "/api/spaces"         && req.method === "POST")   return createOrUpdateSpace(req);
+    if (p === "/api/export-gpu-script" && req.method === "POST") return exportGpuScript(req, env);
 
     const mSpace = p.match(/^\/api\/spaces\/([^/]+)$/);
     if (mSpace && req.method === "DELETE") return deleteSpace(mSpace[1]);
