@@ -5,8 +5,8 @@ const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GE
 
 // ---------------------------------------------------------------------------
 // Password Type Dictionary — read-only, update via code deploy only
-// ---------------------------------------------------------------------------
 // Worker-only deployment: HTML pages deployed separately via deploy_pages workflow
+// ---------------------------------------------------------------------------
 const PASSWORD_TYPES = [
   {
     id: "birthday_ddmmyyyy",
