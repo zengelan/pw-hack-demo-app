@@ -8,6 +8,33 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
   <style>
+    /* Language selector in top right */
+    .language-selector {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .language-selector select {
+      padding: 8px 12px;
+      background: #1a1a1a;
+      border: 1px solid #4a4;
+      border-radius: 6px;
+      color: #eee;
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .language-selector select:hover {
+      background: #2a2a2a;
+      border-color: #6c6;
+    }
+    .language-selector select:focus {
+      outline: none;
+      border-color: #8f8;
+      box-shadow: 0 0 0 2px rgba(136, 255, 136, 0.2);
+    }
+    
     .input-row {
       display: flex;
       align-items: stretch;
@@ -250,6 +277,14 @@
 </head>
 <body>
 
+<!-- Language Selector -->
+<div class="language-selector">
+  <select id="lang-select">
+    <option value="en">English</option>
+    <option value="de">Deutsch</option>
+  </select>
+</div>
+
 <header class="app-header">
   <img src="logo.png" alt="School Logo" class="logo" onerror="this.style.display='none'">
   <h1>Password Security Demo</h1>
@@ -259,8 +294,8 @@
 
   <!-- Step 1: Select Event / Classroom -->
   <div class="card">
-    <h2>Step 1: Select Your Event / Classroom</h2>
-    <p style="color:#aaa;margin-bottom:12px">
+    <h2 data-i18n="step1Title">Step 1: Select Your Event / Classroom</h2>
+    <p style="color:#aaa;margin-bottom:12px" data-i18n="step1Description">
       This demo is running as a <strong>live event</strong>. Your instructor has created a dedicated room (event) for your class session &mdash;
       multiple instructors may be running this demo simultaneously in different classrooms.
       Please select the <strong>correct event or room</strong> that matches your current class session.
@@ -273,8 +308,8 @@
 
   <!-- Step 2: Enter Password -->
   <div id="pw-section" class="card">
-    <h2>Step 2: Enter Your Birthday as Password</h2>
-    <p style="color:#aaa;margin-bottom:12px">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998</p>
+    <h2 data-i18n="step2Title">Step 2: Enter Your Birthday as Password</h2>
+    <p style="color:#aaa;margin-bottom:12px" data-i18n="formatLabel">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998</p>
     
     <div class="input-row">
       <input type="text" id="pw-input" maxlength="8" placeholder="DDMMYYYY" autocomplete="off" inputmode="numeric" pattern="[0-9]{8}">
@@ -286,9 +321,9 @@
     <div class="date-picker-section">
       <!-- Live hash preview -->
       <div class="hash-preview" id="hash-preview">
-        <div style="color:#8f8;font-size:0.95em;font-weight:600;">&#x26A1; SHA-256 Hash Generated:</div>
+        <div style="color:#8f8;font-size:0.95em;font-weight:600;" data-i18n="hashGeneratedLabel">&#x26A1; SHA-256 Hash Generated:</div>
         <div class="hash-value" id="hash-preview-value">...</div>
-        <div class="fingerprint-text">
+        <div class="fingerprint-text" data-i18n="fingerprintText">
           This 64-character string is the <strong>"fingerprint"</strong> of your password. 
           It is the <strong>only thing</strong> sent to the server.
         </div>
@@ -306,36 +341,36 @@
 
   <!-- Project Explanation Section -->
   <div class="project-explanation">
-    <h2>&#x1F4DA; About This Project</h2>
-    <p style="color:#bbb; line-height:1.6;">
+    <h2 data-i18n="aboutTitle">&#x1F4DA; About This Project</h2>
+    <p style="color:#bbb; line-height:1.6;" data-i18n="aboutDescription">
       This application is a security demonstration designed to show how authentication works in modern web apps &mdash; and why certain common practices are dangerous.
     </p>
 
     <div class="hash-explainer">
-      <h3>&#x1F512; How Hashing Works</h3>
-      <p>
+      <h3 data-i18n="hashingTitle">&#x1F512; How Hashing Works</h3>
+      <p data-i18n="hashingDescription">
         When you type or pick your birthday, your browser runs it through a <strong>hash function</strong> (SHA-256).
         This creates a unique fingerprint which is sent to the server. 
         <strong>Your actual birthday never leaves your device.</strong>
       </p>
-      <div class="cow-story">
+      <div class="cow-story" data-i18n="cowAnalogy">
         &#x1F404; <strong>The Cow to Burger Analogy:</strong><br>
         Think of it like turning a cow into a burger. It is easy to go from cow &rarr; burger,
         but <strong>absolutely impossible to reconstruct the original cow from the burger</strong>.
         Hashing is a one-way mathematical function designed exactly like this.
       </div>
-      <p style="margin-top:12px;">
+      <p style="margin-top:12px;" data-i18n="hashingFooter">
         Your password is never sent to the server. Instead, your browser computes this one-way fingerprint &mdash; and only the hash is transmitted.
       </p>
     </div>
     
     <div class="warning-box">
-      <strong>&#x26A0; The Illusion of Safety:</strong><br>
-      Even though we use a secure <strong>SHA-256 hash</strong> (meaning the server never sees your password), this system is still extremely easy to hack. 
-      Why? Because birthdays are <strong>predictable</strong>.
+      <strong data-i18n="warningTitle">&#x26A0; The Illusion of Safety:</strong><br>
+      <span data-i18n="warningText">Even though we use a secure <strong>SHA-256 hash</strong> (meaning the server never sees your password), this system is still extremely easy to hack. 
+      Why? Because birthdays are <strong>predictable</strong>.</span>
     </div>
     
-    <p style="color:#bbb; line-height:1.6; margin-top:15px;">
+    <p style="color:#bbb; line-height:1.6; margin-top:15px;" data-i18n="attackDescription">
       An attacker doesn't need to "reverse" the hash. They just use a <strong>brute-force function</strong>:
       they take every possible date in a 100-year range (~36,500 dates), hash each one, and compare them to your hash. 
       On a modern computer, this takes <strong>less than a second</strong>. 
@@ -345,16 +380,16 @@
 
   <!-- Password Character Space Analysis -->
   <div class="password-space-analysis">
-    <h2>&#x1F522; Password Character Space &amp; Brute Force Times</h2>
-    <p style="color:#bbb; line-height:1.6; margin-bottom:16px;">
+    <h2 data-i18n="passwordSpaceTitle">&#x1F522; Password Character Space &amp; Brute Force Times</h2>
+    <p style="color:#bbb; line-height:1.6; margin-bottom:16px;" data-i18n="passwordSpaceIntro">
       The <strong>character space</strong> of a password is the total number of possible combinations an attacker must try 
       to guarantee cracking it. This table shows various password types ranked by strength (weakest &rarr; strongest), 
       the size of their character space, and how long a brute-force attack would take using two different methods:
     </p>
     
     <ul style="color:#bbb; line-height:1.8; margin-bottom:20px;">
-      <li><strong>Browser (1M hashes/sec):</strong> Using JavaScript in a web browser (SHA-256 via WebCrypto API)</li>
-      <li><strong><a href="https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/" 
+      <li data-i18n="browserMethod"><strong>Browser (1M hashes/sec):</strong> Using JavaScript in a web browser (SHA-256 via WebCrypto API)</li>
+      <li data-i18n="gpuMethod"><strong><a href="https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/" 
           class="gpu-link" target="_blank" rel="noopener">GPU RTX 4090<span class="gpu-tooltip">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png/400px-NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png" 
                  alt="NVIDIA RTX 4090" class="gpu-image">
@@ -367,90 +402,90 @@
       <table class="password-space-table">
         <thead>
           <tr>
-            <th>Password Type</th>
-            <th>Character Set</th>
-            <th>Formula</th>
-            <th>Combinations<br>(Digit Count)</th>
-            <th>Browser<br>(1M/s)</th>
-            <th>GPU RTX 4090<br>(22B/s)</th>
+            <th data-i18n="tablePasswordType">Password Type</th>
+            <th data-i18n="tableCharacterSet">Character Set</th>
+            <th data-i18n="tableFormula">Formula</th>
+            <th data-i18n="tableCombinations">Combinations<br>(Digit Count)</th>
+            <th data-i18n="tableBrowser">Browser<br>(1M/s)</th>
+            <th data-i18n="tableGPU">GPU RTX 4090<br>(22B/s)</th>
           </tr>
         </thead>
         <tbody>
           <tr class="danger-extreme">
-            <td>4-digit PIN</td>
-            <td>Digits 0–9</td>
+            <td data-i18n="pwType4Pin">4-digit PIN</td>
+            <td data-i18n="charSetDigits">Digits 0–9</td>
             <td>10<sup>4</sup></td>
             <td>10,000<br><span class="digit-count">(5 digits)</span></td>
-            <td>~10 ms</td>
-            <td>Instant</td>
+            <td data-i18n="time10ms">~10 ms</td>
+            <td data-i18n="timeInstant">Instant</td>
           </tr>
           <tr class="danger-extreme">
-            <td>8-digit birthday (DDMMYYYY)</td>
-            <td>Valid calendar dates</td>
+            <td data-i18n="pwTypeBirthday">8-digit birthday (DDMMYYYY)</td>
+            <td data-i18n="charSetDates">Valid calendar dates</td>
             <td>~36,525 dates</td>
             <td>36,525<br><span class="digit-count">(5 digits)</span></td>
-            <td>~37 ms</td>
-            <td>Instant</td>
+            <td data-i18n="time37ms">~37 ms</td>
+            <td data-i18n="timeInstant">Instant</td>
           </tr>
           <tr class="danger-high">
-            <td>6-digit number</td>
-            <td>Digits 0–9</td>
+            <td data-i18n="pwType6Digit">6-digit number</td>
+            <td data-i18n="charSetDigits">Digits 0–9</td>
             <td>10<sup>6</sup></td>
             <td>~1.00 × 10<sup>6</sup><br><span class="digit-count">(7 digits)</span></td>
-            <td>~1 second</td>
-            <td>Instant</td>
+            <td data-i18n="time1sec">~1 second</td>
+            <td data-i18n="timeInstant">Instant</td>
           </tr>
           <tr class="danger-medium">
-            <td>8-char lowercase only</td>
-            <td>a–z (26 chars)</td>
+            <td data-i18n="pwType8Lower">8-char lowercase only</td>
+            <td data-i18n="charSetLower">a–z (26 chars)</td>
             <td>26<sup>8</sup></td>
             <td>~2.09 × 10<sup>11</sup><br><span class="digit-count">(12 digits)</span></td>
-            <td>~2.4 days</td>
-            <td>~9.5 seconds</td>
+            <td data-i18n="time24days">~2.4 days</td>
+            <td data-i18n="time95sec">~9.5 seconds</td>
           </tr>
           <tr class="danger-low">
-            <td>8-char alphanumeric</td>
-            <td>a–z, A–Z, 0–9 (62)</td>
+            <td data-i18n="pwType8Alnum">8-char alphanumeric</td>
+            <td data-i18n="charSetAlnum">a–z, A–Z, 0–9 (62)</td>
             <td>62<sup>8</sup></td>
             <td>~2.18 × 10<sup>14</sup><br><span class="digit-count">(15 digits)</span></td>
-            <td>~6.9 years</td>
-            <td>~2.8 hours</td>
+            <td data-i18n="time69years">~6.9 years</td>
+            <td data-i18n="time28hours">~2.8 hours</td>
           </tr>
           <tr class="warning">
-            <td>8-char + special chars</td>
-            <td>94 printable ASCII</td>
+            <td data-i18n="pwType8Special">8-char + special chars</td>
+            <td data-i18n="charSetAscii">94 printable ASCII</td>
             <td>94<sup>8</sup></td>
             <td>~6.10 × 10<sup>15</sup><br><span class="digit-count">(16 digits)</span></td>
-            <td>~193 years</td>
-            <td>~3.2 days</td>
+            <td data-i18n="time193years">~193 years</td>
+            <td data-i18n="time32days">~3.2 days</td>
           </tr>
           <tr class="safe">
-            <td>12-char alphanumeric</td>
-            <td>a–z, A–Z, 0–9 (62)</td>
+            <td data-i18n="pwType12Alnum">12-char alphanumeric</td>
+            <td data-i18n="charSetAlnum">a–z, A–Z, 0–9 (62)</td>
             <td>62<sup>12</sup></td>
             <td>~3.23 × 10<sup>21</sup><br><span class="digit-count">(22 digits)</span></td>
-            <td>~102 million years</td>
-            <td>~4,647 years</td>
+            <td data-i18n="time102myears">~102 million years</td>
+            <td data-i18n="time4647years">~4,647 years</td>
           </tr>
           <tr class="safe">
-            <td>12-char + special chars</td>
-            <td>94 printable ASCII</td>
+            <td data-i18n="pwType12Special">12-char + special chars</td>
+            <td data-i18n="charSetAscii">94 printable ASCII</td>
             <td>94<sup>12</sup></td>
             <td>~4.76 × 10<sup>23</sup><br><span class="digit-count">(24 digits)</span></td>
-            <td>~15.1 billion years</td>
-            <td>~685,500 years</td>
+            <td data-i18n="time151byears">~15.1 billion years</td>
+            <td data-i18n="time685kyears">~685,500 years</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div style="margin-top:24px; padding:18px; background:#1a1a0a; border:1px solid #3a3a1a; border-radius:8px;">
-      <h3 style="color:#dd8; margin-top:0;">&#x1F4A1; Key Takeaways</h3>
+      <h3 style="color:#dd8; margin-top:0;" data-i18n="keyTakeawaysTitle">&#x1F4A1; Key Takeaways</h3>
       <ul style="color:#bba; line-height:1.8; margin:8px 0; padding-left:20px;">
-        <li><strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser</li>
-        <li><strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)</li>
-        <li><strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU</li>
-        <li><strong>This assumes NO salting</strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords</li>
+        <li data-i18n="takeaway1"><strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser</li>
+        <li data-i18n="takeaway2"><strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)</li>
+        <li data-i18n="takeaway3"><strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU</li>
+        <li data-i18n="takeaway4"><strong>This assumes NO salting</strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords</li>
       </ul>
     </div>
   </div>
@@ -460,9 +495,19 @@
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
+<script src="js/translations.js"></script>
 <script src="js/student.js"></script>
 <script>
 (function() {
+  // Initialize language
+  window.i18n.initLanguage();
+  window.i18n.updatePageLanguage();
+  
+  // Language selector handler
+  document.getElementById('lang-select').addEventListener('change', function(e) {
+    window.i18n.setLanguage(e.target.value);
+  });
+  
   var pwInput = document.getElementById('pw-input');
   var preview = document.getElementById('hash-preview');
   var previewVal = document.getElementById('hash-preview-value');
@@ -483,7 +528,7 @@
   }
 
   var fp = flatpickr("#hidden-picker", {
-    locale: "de",
+    locale: window.i18n.getCurrentLanguage(),
     dateFormat: "dmY",
     allowInput: false,
     clickOpens: false,
