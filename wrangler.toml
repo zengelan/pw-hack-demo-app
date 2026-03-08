@@ -12,7 +12,7 @@ APP_BRANCH = "main"
 directory = "./public"
 
 [[kv_namespaces]]
-binding = "PWDEMOAPPHASES"
+binding = "PWDEMOAPPHASHES"
 id      = "31d012e28d2245aa8ca5d8a393bad836"
 
 [[kv_namespaces]]
