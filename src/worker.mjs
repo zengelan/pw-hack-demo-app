@@ -58,6 +58,7 @@ async function allowed(req,env){
   return false;
 }
 async function rateLimited(ip,env){
+  if(!env?.PWDEMOAPPHASHES) return false;
   const k="rl:"+ip,l=await env.PWDEMOAPPHASHES.get(k);
   if(l&&Date.now()-+l<RATE_LIMIT_MS)return true;
   await env.PWDEMOAPPHASHES.put(k,String(Date.now()),{expirationTtl:60});return false;
