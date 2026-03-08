@@ -36,7 +36,7 @@ const translations = {
     passwordSpaceTitle: "&#x1F522; Password Character Space &amp; Brute Force Times",
     passwordSpaceIntro: "The <strong>character space</strong> of a password is the total number of possible combinations an attacker must try to guarantee cracking it. This table shows various password types ranked by strength (weakest &rarr; strongest), the size of their character space, and how long a brute-force attack would take using two different methods:",
     browserMethod: "<strong>Browser (1M hashes/sec):</strong> Using JavaScript in a web browser (SHA-256 via WebCrypto API)",
-    gpuMethod: "<strong><a href=\"https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/\" class=\"gpu-link\" target=\"_blank\" rel=\"noopener\">GPU RTX 4090<span class=\"gpu-tooltip\"><img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png/400px-NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png\" alt=\"NVIDIA RTX 4090\" class=\"gpu-image\"></span></a> (22B hashes/sec):</strong> Using a consumer GPU with hashcat for password cracking",
+    gpuMethod: "<strong><a href=\"https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/\" class=\"gpu-link\" target=\"_blank\" rel=\"noopener\">GPU RTX 4090<span class=\"gpu-tooltip\"><img src=\"gpu.png\" alt=\"NVIDIA RTX 4090\" class=\"gpu-image\"></span></a> (22B hashes/sec):</strong> Using a consumer GPU with hashcat for password cracking",
     
     // Table headers
     tablePasswordType: "Password Type",
@@ -140,7 +140,7 @@ const translations = {
     passwordSpaceTitle: "&#x1F522; Passwort-Zeichenraum &amp; Brute-Force-Zeiten",
     passwordSpaceIntro: "Der <strong>Zeichenraum</strong> eines Passworts ist die Gesamtzahl möglicher Kombinationen, die ein Angreifer ausprobieren muss, um es garantiert zu knacken. Diese Tabelle zeigt verschiedene Passworttypen nach Stärke sortiert (schwächste &rarr; stärkste), die Größe ihres Zeichenraums und wie lange ein Brute-Force-Angriff mit zwei verschiedenen Methoden dauern würde:",
     browserMethod: "<strong>Browser (1M Hashes/Sek):</strong> Mit JavaScript in einem Webbrowser (SHA-256 über WebCrypto API)",
-    gpuMethod: "<strong><a href=\"https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/\" class=\"gpu-link\" target=\"_blank\" rel=\"noopener\">GPU RTX 4090<span class=\"gpu-tooltip\"><img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png/400px-NVIDIA_RTX_4090_Founders_Edition_-_Verpackung_%28ZMASLO%29.png\" alt=\"NVIDIA RTX 4090\" class=\"gpu-image\"></span></a> (22B Hashes/Sek):</strong> Mit einer Consumer-GPU und hashcat zum Passwort-Knacken",
+    gpuMethod: "<strong><a href=\"https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/\" class=\"gpu-link\" target=\"_blank\" rel=\"noopener\">GPU RTX 4090<span class=\"gpu-tooltip\"><img src=\"gpu.png\" alt=\"NVIDIA RTX 4090\" class=\"gpu-image\"></span></a> (22B Hashes/Sek):</strong> Mit einer Consumer-GPU und hashcat zum Passwort-Knacken",
     
     // Table headers
     tablePasswordType: "Passwort-Typ",
