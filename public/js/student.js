@@ -5,6 +5,8 @@ const MAX_SUBMISSIONS = 25;
 let selectedPasswordType = null;
 let _passwordTypes = [];
 let _spaces        = []; // fetched once by loadSpaces(), reused by onSpaceChange()
+let isSubmittingHash = false; // Track if user is submitting a hash directly
+let lowercaseInputHandler = null; // Store handler for lowercase input conversion
 
 // ---------------------------------------------------------------------------
 // Boot sequence
@@ -29,6 +31,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('pw-input')
       .addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
 
+  // Add real-time validation for password input
+  document.getElementById('pw-input')
+      .addEventListener('input', onPasswordInput);
+
+  // Make status message a live region for screen readers
+  var statusMsg = document.getElementById('status-msg');
+  if (statusMsg) {
+    statusMsg.setAttribute('role', 'status');
+    statusMsg.setAttribute('aria-live', 'polite');
+    statusMsg.setAttribute('aria-atomic', 'true');
+  }
+
   // pw-type radio listeners are added dynamically in renderPasswordTypeSection()
 });
 
@@ -50,10 +64,10 @@ async function loadPasswordTypes() {
       label: 'Birthday (DDMMYYYY)',
       description: 'An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.',
       format: 'DDMMYYYY',
-      regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|200[0-9])$',
-      possibleValues: 26645,
+      regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-6])$',
+      possibleValues: 38797,
       exampleValues: ['01011990', '24121985', '07031975'],
-      crackingHint: 'Brute-forceable in milliseconds — only ~27k valid calendar dates.',
+      crackingHint: 'Brute-forceable in milliseconds — only ~39k valid calendar dates.',
       weaknessLevel: 'very_high'
     }];
   }
@@ -68,6 +82,8 @@ function renderPasswordTypeSection() {
   if (!section || !cards) return;
 
   cards.innerHTML = ''; // clears the static "Loading…" placeholder too
+  cards.setAttribute('role', 'radiogroup');
+  cards.setAttribute('aria-label', 'Password type selection');
 
   _passwordTypes.forEach((type, idx) => {
     const isFirst = idx === 0;
@@ -87,6 +103,7 @@ function renderPasswordTypeSection() {
 
     card.innerHTML =
         '<input type="radio" id="pwtype-' + type.id + '" name="pw-type" value="' + type.id + '"' +
+        ' aria-label="' + type.label + ' - ' + type.format + '"' +
         ' style="margin-top:4px;flex-shrink:0;accent-color:var(--accent,#4af);"' +
         (isFirst ? ' checked' : '') + '>' +
         '<div style="line-height:1.4;">' +
@@ -133,13 +150,179 @@ function onPasswordTypeChange(type) {
     infoEl.style.display = 'block';
   }
 
+  // Update the format label
+  var formatLabel = document.getElementById('pw-format-label');
+  if (formatLabel) {
+    var ex = type.exampleValues && type.exampleValues[0];
+    formatLabel.innerHTML = 'Format: <strong>' + type.format + '</strong> &nbsp; Example: ' + (ex || 'N/A');
+  }
+
+  // Update input placeholder and attributes
   var pwInput = document.getElementById('pw-input');
   if (pwInput) {
     var ex = type.exampleValues && type.exampleValues[0];
     pwInput.placeholder = type.format + (ex ? '  e.g. ' + ex : '');
+    
+    // Clear the input when switching types
+    pwInput.value = '';
+    
+    // Remove old lowercase handler if exists
+    if (lowercaseInputHandler) {
+      pwInput.removeEventListener('input', lowercaseInputHandler);
+      lowercaseInputHandler = null;
+    }
+    
+    // Remove old attributes
+    pwInput.removeAttribute('maxlength');
+    pwInput.removeAttribute('inputmode');
+    pwInput.removeAttribute('pattern');
+    pwInput.removeAttribute('autocomplete');
+    pwInput.removeAttribute('autocapitalize');
+    pwInput.removeAttribute('spellcheck');
+    pwInput.style.borderColor = '';
+    
+    // Set attributes based on password type
+    if (type.id === 'birthday_ddmmyyyy') {
+      // Birthday: numeric only, 8 digits
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'numeric');
+      pwInput.setAttribute('pattern', '[0-9]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+      pwInput.setAttribute('aria-label', 'Enter your birthday in DDMMYYYY format');
+    } else if (type.id === 'digits8') {
+      // 8-digit PIN: numeric only
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'numeric');
+      pwInput.setAttribute('pattern', '[0-9]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+      pwInput.setAttribute('aria-label', 'Enter 8-digit PIN');
+    } else if (type.id === 'lowercase8') {
+      // Lowercase letters: text, 8 chars, no caps/autocorrect
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'text');
+      pwInput.setAttribute('pattern', '[a-z]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+      pwInput.setAttribute('autocapitalize', 'none');
+      pwInput.setAttribute('spellcheck', 'false');
+      pwInput.setAttribute('aria-label', 'Enter 8 lowercase letters');
+      
+      // Add auto-lowercase conversion for lowercase8 type
+      lowercaseInputHandler = function(e) {
+        var cursorPos = e.target.selectionStart;
+        var oldValue = e.target.value;
+        var newValue = oldValue.toLowerCase();
+        if (oldValue !== newValue) {
+          e.target.value = newValue;
+          e.target.setSelectionRange(cursorPos, cursorPos);
+        }
+      };
+      pwInput.addEventListener('input', lowercaseInputHandler);
+    } else if (type.length) {
+      // Generic: infer from length property
+      pwInput.setAttribute('maxlength', type.length.toString());
+      pwInput.setAttribute('aria-label', 'Enter password');
+    }
   }
 
+  // Show/hide calendar button based on password type
+  var calendarBtn = document.getElementById('calendar-trigger');
+  if (calendarBtn) {
+    if (type.id === 'birthday_ddmmyyyy') {
+      calendarBtn.classList.remove('hidden');
+    } else {
+      calendarBtn.classList.add('hidden');
+    }
+  }
+
+  // Clear any existing validation errors when type changes
+  var status = document.getElementById('status-msg');
+  if (status) status.innerHTML = '';
+
+  // Clear hash preview
+  var preview = document.getElementById('hash-preview');
+  if (preview) preview.classList.remove('visible');
+
   document.getElementById('pw-section').style.display = 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Real-time password validation
+// ---------------------------------------------------------------------------
+function onPasswordInput() {
+  var pwInput = document.getElementById('pw-input');
+  var pw = pwInput.value.trim();
+  var status = document.getElementById('status-msg');
+  var preview = document.getElementById('hash-preview');
+
+  // Clear status on input change
+  status.innerHTML = '';
+  pwInput.style.borderColor = '';
+
+  // If empty, hide preview and clear errors
+  if (!pw) {
+    preview.classList.remove('visible');
+    pwInput.removeAttribute('aria-invalid');
+    return;
+  }
+
+  // Check if input looks like a hash (64 hex characters)
+  var hashPattern = /^[a-fA-F0-9]{64}$/;
+  if (hashPattern.test(pw)) {
+    // User entered a hash - show specific error message
+    preview.classList.remove('visible');
+    isSubmittingHash = true;
+    status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + 
+        'Please enter your password, not a hash. The hash will be generated automatically.</span>';
+    pwInput.style.borderColor = '#fa0';
+    pwInput.setAttribute('aria-invalid', 'true');
+    return;
+  }
+
+  isSubmittingHash = false;
+
+  // Validate password format based on selected type
+  if (selectedPasswordType && selectedPasswordType.regex) {
+    var regex = new RegExp(selectedPasswordType.regex);
+    if (!regex.test(pw)) {
+      var ex = selectedPasswordType.exampleValues && selectedPasswordType.exampleValues[0];
+      status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusInvalidFormat') + ' '
+          + '<strong>' + selectedPasswordType.label + '</strong>. '
+          + window.i18n.t('statusExpected') + ' <code>' + selectedPasswordType.format + '</code>'
+          + (ex ? ' (e.g. <code>' + ex + '</code>)' : '') + '</span>';
+      preview.classList.remove('visible');
+      pwInput.style.borderColor = '#fa0';
+      pwInput.setAttribute('aria-invalid', 'true');
+      return;
+    }
+  }
+
+  // Valid password - show green border and checkmark
+  pwInput.style.borderColor = '#4a4';
+  pwInput.removeAttribute('aria-invalid');
+
+  // Valid password - update hash preview
+  updateHashPreview(pw);
+}
+
+// ---------------------------------------------------------------------------
+// Hash preview update
+// ---------------------------------------------------------------------------
+async function updateHashPreview(password) {
+  var preview = document.getElementById('hash-preview');
+  var previewVal = document.getElementById('hash-preview-value');
+
+  if (password && !isSubmittingHash) {
+    try {
+      var hash = await sha256(password);
+      previewVal.textContent = hash;
+      preview.classList.add('visible');
+    } catch (e) {
+      console.error('Error generating hash:', e);
+      preview.classList.remove('visible');
+    }
+  } else {
+    preview.classList.remove('visible');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -297,19 +480,32 @@ function setupMetaDisclosure() {
 // ---------------------------------------------------------------------------
 async function onSubmit() {
   var spaceId = document.getElementById('space-select').value;
-  var pw      = document.getElementById('pw-input').value.trim();
+  var pwInput = document.getElementById('pw-input');
+  var pw      = pwInput.value.trim();
   var status  = document.getElementById('status-msg');
 
   if (!spaceId) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a space first.</span>';
+    status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusSelectSpace') + '</span>';
     return;
   }
   if (!selectedPasswordType) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a password type first.</span>';
+    status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusSelectPasswordType') + '</span>';
     return;
   }
   if (!pw) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please enter a password.</span>';
+    status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusEnterPassword') + '</span>';
+    pwInput.focus();
+    return;
+  }
+
+  // Check if user is trying to submit a hash directly
+  var hashPattern = /^[a-fA-F0-9]{64}$/;
+  if (hashPattern.test(pw)) {
+    // This is a hash - show specific error
+    status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + 
+        'Please enter your password, not a hash. The hash will be generated automatically.</span>';
+    pwInput.style.borderColor = '#fa0';
+    pwInput.setAttribute('aria-invalid', 'true');
     return;
   }
 
@@ -317,10 +513,12 @@ async function onSubmit() {
   if (selectedPasswordType.regex) {
     if (!new RegExp(selectedPasswordType.regex).test(pw)) {
       var ex = selectedPasswordType.exampleValues && selectedPasswordType.exampleValues[0];
-      status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Format invalid for '
+      status.innerHTML = '<span role="alert" style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusInvalidFormat') + ' '
           + '<strong>' + selectedPasswordType.label + '</strong>. '
-          + 'Expected: <code>' + selectedPasswordType.format + '</code>'
+          + window.i18n.t('statusExpected') + ' <code>' + selectedPasswordType.format + '</code>'
           + (ex ? ' (e.g. <code>' + ex + '</code>)' : '') + '</span>';
+      pwInput.style.borderColor = '#fa0';
+      pwInput.setAttribute('aria-invalid', 'true');
       return;
     }
   }
@@ -331,7 +529,7 @@ async function onSubmit() {
   var hash = await sha256(pw);
   var meta = collectMeta();
 
-  status.innerHTML = '<span style="color:#7af">&#x1F4E4; Submitting&#x2026;</span>';
+  status.innerHTML = '<span style="color:#7af">&#x1F4E4; ' + window.i18n.t('statusSubmitting') + '</span>';
 
   try {
     var res = await fetch('/api/submit', {
@@ -342,23 +540,24 @@ async function onSubmit() {
     var data = await res.json();
 
     if (res.status === 403) {
-      status.innerHTML = '<span style="color:#f00">&#x1F6AB; ' + (data.error || 'Access denied.') + '</span>'
-          + (data.ip ? '<br>Your IP: ' + data.ip : '');
+      status.innerHTML = '<span role="alert" style="color:#f00">&#x1F6AB; ' + (data.error || window.i18n.t('statusAccessDenied')) + '</span>'
+          + (data.ip ? '<br>' + window.i18n.t('statusYourIP') + data.ip : '');
       document.getElementById('submit-btn').disabled = false;
     } else if (res.status === 429) {
-      status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; ' + (data.error || 'Maximum submissions reached.') + '</span>';
+      status.innerHTML = '<span role="alert" style="color:#f00">&#x26A0;&#xFE0F; ' + (data.error || window.i18n.t('statusMaxSubmissions')) + '</span>';
     } else if (res.ok) {
-      status.innerHTML = '<span style="color:#0f0">&#x2705; Hash submitted!</span><br>'
-          + 'Hash: <code>' + hash.substring(0, 32) + '&#x2026;</code>';
-      document.getElementById('pw-input').value     = '';
-      document.getElementById('pw-input').disabled  = true;
+      status.innerHTML = '<span style="color:#0f0">&#x2705; ' + window.i18n.t('statusSuccess') + '</span><br>'
+          + window.i18n.t('statusHash') + '<code>' + hash.substring(0, 32) + '&#x2026;</code>';
+      pwInput.value     = '';
+      pwInput.disabled  = true;
+      pwInput.style.borderColor = '';
       document.getElementById('submit-btn').disabled = true;
     } else {
-      status.innerHTML = '<span style="color:#f00">&#x274C; ' + (data.error || 'Submission failed.') + '</span>';
+      status.innerHTML = '<span role="alert" style="color:#f00">&#x274C; ' + (data.error || window.i18n.t('statusFailed')) + '</span>';
       document.getElementById('submit-btn').disabled = false;
     }
   } catch (e) {
-    status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; Network error: ' + e.message + '</span>';
+    status.innerHTML = '<span role="alert" style="color:#f00">&#x26A0;&#xFE0F; ' + window.i18n.t('statusNetworkError') + e.message + '</span>';
     document.getElementById('submit-btn').disabled = false;
   }
 }
