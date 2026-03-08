@@ -299,9 +299,15 @@ async function loadSpacesAdmin() {
   if (!tbody) return;
   try {
     const res = await fetch('/api/spaces');
-    if (!res.ok) return;
-    const data = await res.json();
-    const spaces = data.spaces || [];
+    if (!res.ok) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Error loading spaces (API returned ' + res.status + ')</td></tr>';
+      return;
+    }
+    const spaces = await res.json(); // Backend returns direct array
+    if (!Array.isArray(spaces)) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Invalid response format from spaces API</td></tr>';
+      return;
+    }
     tbody.innerHTML = '';
     if (spaces.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#666">No spaces yet. Create one below.</td></tr>';
@@ -328,6 +334,7 @@ async function loadSpacesAdmin() {
     };
   } catch (e) {
     console.error('Spaces load error:', e);
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Network error loading spaces: ' + e.message + '</td></tr>';
   }
 }
 

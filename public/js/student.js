@@ -16,15 +16,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSpaces() {
   try {
     const res = await fetch('/api/spaces');
-    const data = await res.json();
-    const spaces = data.spaces || [];
+    if (!res.ok) {
+      throw new Error('API returned status ' + res.status);
+    }
+    const spaces = await res.json(); // Backend returns direct array
+    if (!Array.isArray(spaces)) {
+      throw new Error('Invalid response format');
+    }
+    
     const sel = document.getElementById('space-select');
+    
+    if (spaces.length === 0) {
+      // No spaces available - show message and allow password entry anyway
+      const opt = document.createElement('option');
+      opt.value = 'default';
+      opt.textContent = 'Default Space (No spaces configured)';
+      sel.appendChild(opt);
+      sel.value = 'default';
+      document.getElementById('pw-section').style.display = 'block';
+      document.getElementById('space-info').innerHTML = 
+        '<p style="color:#fa0;padding:8px;background:#1a1a0a;border-radius:4px;">⚠️ No spaces configured. Using default space.</p>';
+      document.getElementById('space-info').style.display = 'block';
+      return;
+    }
+    
     spaces.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.name;
       sel.appendChild(opt);
     });
+    
     // Auto-select and auto-trigger if there is only one space
     if (spaces.length === 1) {
       sel.value = spaces[0].id;
@@ -32,20 +54,52 @@ async function loadSpaces() {
     }
   } catch(e) {
     console.error('Failed to load spaces:', e);
+    // Show error but still allow password entry
+    const sel = document.getElementById('space-select');
+    const opt = document.createElement('option');
+    opt.value = 'default';
+    opt.textContent = 'Default Space (API Error)';
+    sel.appendChild(opt);
+    sel.value = 'default';
+    document.getElementById('pw-section').style.display = 'block';
+    document.getElementById('space-info').innerHTML = 
+      '<p style="color:#f00;padding:8px;background:#1a0a0a;border-radius:4px;">⚠️ Failed to load spaces: ' + e.message + '. Using default space.</p>';
+    document.getElementById('space-info').style.display = 'block';
   }
 }
 
 // --- Space selection ---
 async function onSpaceChange() {
   const spaceId = document.getElementById('space-select').value;
-  if (!spaceId) return;
+  if (!spaceId) {
+    document.getElementById('pw-section').style.display = 'none';
+    return;
+  }
+  
+  // Always show password section when a space is selected
+  document.getElementById('pw-section').style.display = 'block';
+  
+  // Try to fetch space details
   try {
     const res = await fetch('/api/spaces');
-    const data = await res.json();
-    const space = (data.spaces || []).find(s => s.id === spaceId);
-    if (space) renderSpaceInfo(space);
-  } catch(e) {}
-  document.getElementById('pw-section').style.display = 'block';
+    if (!res.ok) throw new Error('API error');
+    const spaces = await res.json(); // Backend returns direct array
+    if (!Array.isArray(spaces)) throw new Error('Invalid format');
+    
+    const space = spaces.find(s => s.id === spaceId);
+    if (space) {
+      renderSpaceInfo(space);
+    } else if (spaceId === 'default') {
+      // Default space selected, already shown message
+    } else {
+      document.getElementById('space-info').innerHTML = 
+        '<p style="color:#aaa;padding:8px;">Space information not available</p>';
+      document.getElementById('space-info').style.display = 'block';
+    }
+  } catch(e) {
+    // Space details failed but we can still proceed
+    console.error('Failed to fetch space details:', e);
+  }
 }
 
 function renderSpaceInfo(space) {
@@ -111,22 +165,25 @@ async function onSubmit() {
   const spaceId = document.getElementById('space-select').value;
   const pw = document.getElementById('pw-input').value.trim();
   const status = document.getElementById('status-msg');
+  
   if (!spaceId) {
-    status.textContent = 'Please select a space first.';
+    status.innerHTML = '<span style="color:#fa0">⚠️ Please select a space first.</span>';
     return;
   }
   if (!pw) {
-    status.textContent = 'Please enter a password.';
+    status.innerHTML = '<span style="color:#fa0">⚠️ Please enter a password.</span>';
     return;
   }
   if (!/^\d{8}$/.test(pw)) {
-    status.textContent = 'Password must be 8 digits (DDMMYYYY).';
+    status.innerHTML = '<span style="color:#fa0">⚠️ Password must be 8 digits (DDMMYYYY).</span>';
     return;
   }
+  
   const hash = await sha256(pw);
   const meta = collectMeta();
-  status.textContent = 'Submitting...';
+  status.innerHTML = '<span style="color:#7af">📤 Submitting...</span>';
   document.getElementById('submit-btn').disabled = true;
+  
   try {
     const res = await fetch('/api/submit', {
       method: 'POST',
@@ -134,21 +191,23 @@ async function onSubmit() {
       body: JSON.stringify({spaceId, hash, meta})
     });
     const data = await res.json();
+    
     if (res.status === 403) {
-      status.innerHTML = '<span style="color:#f00">' + (data.error || 'Access denied.') + '</span><br>Your IP: ' + (data.ip || '');
+      status.innerHTML = '<span style="color:#f00">🚫 ' + (data.error || 'Access denied.') + '</span><br>Your IP: ' + (data.ip || '');
+      document.getElementById('submit-btn').disabled = false;
     } else if (res.status === 429) {
-      status.innerHTML = '<span style="color:#f00">' + (data.error || 'Maximum submissions reached. No more passwords accepted.') + '</span>';
+      status.innerHTML = '<span style="color:#f00">⚠️ ' + (data.error || 'Maximum submissions reached. No more passwords accepted.') + '</span>';
     } else if (res.ok) {
-      status.innerHTML = '<span style="color:#0f0">Hash submitted successfully!</span><br>Hash: <code>' + hash.substring(0,32) + '...</code>';
+      status.innerHTML = '<span style="color:#0f0">✅ Hash submitted successfully!</span><br>Hash: <code>' + hash.substring(0,32) + '...</code>';
       document.getElementById('pw-input').value = '';
       document.getElementById('pw-input').disabled = true;
       document.getElementById('submit-btn').disabled = true;
     } else {
-      status.textContent = data.error || 'Submission failed.';
+      status.innerHTML = '<span style="color:#f00">❌ ' + (data.error || 'Submission failed.') + '</span>';
       document.getElementById('submit-btn').disabled = false;
     }
   } catch(e) {
-    status.textContent = 'Network error: ' + e.message;
+    status.innerHTML = '<span style="color:#f00">⚠️ Network error: ' + e.message + '</span>';
     document.getElementById('submit-btn').disabled = false;
   }
 }
