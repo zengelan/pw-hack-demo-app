@@ -1,3 +1,5 @@
+const APP_VERSION="v0.0.1";
+const APP_NAME="pw-hack-demo-app";
 const MAX_HASHES=25,RATE_LIMIT_MS=30000,HASHES_CACHE_TTL=5000,INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 function json(d,s=200){return new Response(JSON.stringify(d),{status:s,headers:{"Content-Type":"application/json",...CORS}});}
@@ -8,7 +10,8 @@ let _ac=null,_at=0,_hc=null,_ht=0;
 async function getIndex(env){
   const raw=await env.PWDEMOAPPHASHES.get(INDEX_KEY);
   if(!raw)return[];
-  try{const ids=JSON.parse(raw);return Array.isArray(ids)?ids.filter(id=>!id.startsWith("rl:")):[]; }catch{return[];}
+  try{const ids=JSON.parse(raw);return Array.isArray(ids)?ids.filter(id=>!id.startsWith("rl:")):[];
+  }catch{return[];}
 }
 async function saveIndex(env,ids){
   await env.PWDEMOAPPHASHES.put(INDEX_KEY,JSON.stringify(ids),{expirationTtl:7200});
@@ -63,14 +66,12 @@ const SPACES_KEY="spaces";
 async function getSpacesList(env){
   const raw=await env.PWDEMOAPPALLOWLIST.get(SPACES_KEY);
   if(!raw)return[];
-  try{const p=JSON.parse(raw);return Array.isArray(p)?p:[];}catch{return[];}
+  try{return JSON.parse(raw);}catch{return[];}
 }
 async function saveSpacesList(env,spaces){
   await env.PWDEMOAPPALLOWLIST.put(SPACES_KEY,JSON.stringify(spaces));
 }
-async function listSpaces(env){
-  return json({spaces:await getSpacesList(env)});
-}
+async function listSpaces(env){return json(await getSpacesList(env));}
 async function createOrUpdateSpace(req,env){
   const body=await req.json().catch(()=>null);
   if(!body||typeof body.id!=="string"||!body.id.trim()||typeof body.name!=="string"||!body.name.trim()){
@@ -89,6 +90,11 @@ async function deleteSpace(env,id){
   if(filtered.length===spaces.length)return json({error:"Not found"},404);
   await saveSpacesList(env,filtered);
   return json({success:true});
+}
+
+// --- Version ---
+function version(){
+  return json({version:APP_VERSION,name:APP_NAME});
 }
 
 // --- Core API ---
@@ -118,7 +124,7 @@ async function hashes(env){
   const now=Date.now();
   if(_hc&&(now-_ht)<HASHES_CACHE_TTL)return json(_hc);
   const idx=await getIndex(env);
-  const rows=await Promise.all(idx.slice(0,MAX_HASHES).map(id=>env.PWDEMOAPPHASHES.get(id,{type:"json"})));
+  const rows=await Promise.all(idx.map(id=>env.PWDEMOAPPHASHES.get(id,{type:"json"})));
   _hc=rows.filter(Boolean);_ht=now;
   return json(_hc);
 }
@@ -152,7 +158,9 @@ async function updateAllowlist(req,env){
 export default{
   async fetch(req,env){
     const url=new URL(req.url),p=url.pathname;
+    console.log(`[${APP_NAME}@${APP_VERSION}] ${req.method} ${p}`);
     if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
+    if(p==="/api/version"&&req.method==="GET")return version();
     if(p==="/api/myip"&&req.method==="GET")return myIp(req);
     if(p==="/api/hashes"&&req.method==="GET")return hashes(env);
     if(p==="/api/submit"&&req.method==="POST")return submit(req,env);
