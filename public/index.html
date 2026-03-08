@@ -193,6 +193,7 @@
       color: #eee;
       font-weight: 600;
       border-bottom: 2px solid #444;
+      position: relative;
     }
     .password-space-table td {
       padding: 10px;
@@ -270,6 +271,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       z-index: 1000;
       pointer-events: none;
+      white-space: nowrap;
     }
     .gpu-image {
       display: block;
@@ -461,7 +463,14 @@
           <th data-i18n="tableFormula">Formula</th>
           <th data-i18n="tableCombinations">Combinations<br>(Digit Count)</th>
           <th data-i18n="tableBrowser">Browser<br>(1M/s)</th>
-          <th data-i18n="tableGPU">GPU RTX 4090<br>(22B/s)</th>
+          <th data-i18n="tableGPU">
+            <span class="gpu-link" style="cursor: help;">
+              GPU RTX 4090<br>(22B/s)
+              <span class="gpu-tooltip">
+                <img src="gpu.png" alt="NVIDIA RTX 4090" class="gpu-image">
+              </span>
+            </span>
+          </th>
         </tr>
         </thead>
         <tbody>
