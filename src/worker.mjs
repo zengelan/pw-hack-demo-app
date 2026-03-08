@@ -240,17 +240,15 @@ async function submit(req, env) {
   if (idx.length >= MAX_HASHES) return json({error: "Demo full. Max 25 submissions reached."}, 429);
 
   const body = await req.json().catch(() => null);
-  if (!body?.hash || !body?.spaceId || !body?.passwordTypeId) {
-    return json({error: "Missing fields: hash, spaceId and passwordTypeId are required."}, 400);
+  if (!body?.hash || !body?.spaceId) {
+    return json({error: "Missing fields: hash and spaceId are required."}, 400);
   }
   if (!/^[a-f0-9]{64}$/i.test(body.hash)) {
     return json({error: "Invalid hash. Expected SHA-256 hex."}, 400);
   }
-  if (!PASSWORD_TYPE_IDS.has(body.passwordTypeId)) {
-    return json({
-      error: "Invalid passwordTypeId.",
-      validIds: [...PASSWORD_TYPE_IDS]
-    }, 400);
+  const passwordTypeId = body.passwordTypeId ?? null;
+  if (passwordTypeId !== null && !PASSWORD_TYPE_IDS.has(passwordTypeId)) {
+    return json({ error: "Invalid passwordTypeId.", validIds: [...PASSWORD_TYPE_IDS] }, 400);
   }
 
   const spaces = await getSpacesList();
@@ -263,7 +261,7 @@ async function submit(req, env) {
     id,
     hash: body.hash,
     spaceId: body.spaceId,
-    passwordTypeId: body.passwordTypeId,
+    passwordTypeId: passwordTypeId,
     submitted: Date.now(),
     cracked: false, attempts: 0, password: null, crackedAt: null,
     meta: {
@@ -292,7 +290,7 @@ async function hashes() {
   if (_hc && (now - _ht) < HASHES_CACHE_TTL) return json(_hc);
   const idx = await getIndex();
   const rows = await Promise.all(idx.map(id => KV_HASHES.getWithMetadata(id)));
-  _hc = rows.map(r => r.metadata ? JSON.parse(r.value) : null).filter(Boolean);
+  _hc = rows.map(r => r.value ? JSON.parse(r.value) : null).filter(Boolean);
   _ht = now;
   return json(_hc);
 }
