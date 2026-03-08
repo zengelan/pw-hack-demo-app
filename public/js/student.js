@@ -2,218 +2,363 @@
 
 const MAX_SUBMISSIONS = 25;
 
+let selectedPasswordType = null;
+let _passwordTypes = [];
+let _spaces        = []; // fetched once by loadSpaces(), reused by onSpaceChange()
+
+// ---------------------------------------------------------------------------
+// Boot sequence
+// ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', async () => {
+  // 1. Types first: loadSpaces() may immediately call renderPasswordTypeSection()
+  //    so _passwordTypes[] must be populated before that can happen.
+  await loadPasswordTypes();
+
+  // 2. Fetch spaces ONCE into _spaces; onSpaceChange() reuses the cache.
   await loadSpaces();
+
+  // 3. Wire up all persistent event listeners
   setupMetaDisclosure();
-  document.getElementById('space-select').addEventListener('change', onSpaceChange);
-  document.getElementById('submit-btn').addEventListener('click', onSubmit);
-  document.getElementById('pw-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') onSubmit();
-  });
+
+  document.getElementById('space-select')
+      .addEventListener('change', onSpaceChange);
+
+  document.getElementById('submit-btn')
+      .addEventListener('click', onSubmit);
+
+  document.getElementById('pw-input')
+      .addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
+
+  // pw-type radio listeners are added dynamically in renderPasswordTypeSection()
 });
 
-// --- Load spaces from API ---
+// ---------------------------------------------------------------------------
+// Password Types  —  /api/password-types
+// ---------------------------------------------------------------------------
+async function loadPasswordTypes() {
+  try {
+    const res = await fetch('/api/password-types');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data.types) || data.types.length === 0)
+      throw new Error('Empty or invalid response');
+    _passwordTypes = data.types;
+  } catch (e) {
+    console.error('Failed to load password types, using fallback:', e);
+    _passwordTypes = [{
+      id: 'birthday_ddmmyyyy',
+      label: 'Birthday (DDMMYYYY)',
+      description: 'An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.',
+      format: 'DDMMYYYY',
+      regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|200[0-9])$',
+      possibleValues: 26645,
+      exampleValues: ['01011990', '24121985', '07031975'],
+      crackingHint: 'Brute-forceable in milliseconds — only ~27k valid calendar dates.',
+      weaknessLevel: 'very_high'
+    }];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Password Type selector  —  builds cards into #pwtype-cards
+// ---------------------------------------------------------------------------
+function renderPasswordTypeSection() {
+  const section = document.getElementById('pwtype-section');
+  const cards   = document.getElementById('pwtype-cards');
+  if (!section || !cards) return;
+
+  cards.innerHTML = ''; // clears the static "Loading…" placeholder too
+
+  _passwordTypes.forEach((type, idx) => {
+    const isFirst = idx === 0;
+    const card    = document.createElement('label');
+
+    card.style.cssText = [
+      'display:flex', 'align-items:flex-start', 'gap:12px',
+      'padding:12px 16px', 'margin-bottom:8px',
+      'border:2px solid var(--border,#444)', 'border-radius:8px',
+      'cursor:pointer', 'transition:border-color 0.15s,background 0.15s',
+      isFirst ? 'border-color:var(--accent,#4af);background:rgba(68,170,255,0.07)' : ''
+    ].join(';');
+    card.setAttribute('for', 'pwtype-' + type.id);
+
+    const weakIcon = { very_high: '🔴', high: '🟠', medium: '🟡', low: '🟢' }
+        [type.weaknessLevel] || '⚪';
+
+    card.innerHTML =
+        '<input type="radio" id="pwtype-' + type.id + '" name="pw-type" value="' + type.id + '"' +
+        ' style="margin-top:4px;flex-shrink:0;accent-color:var(--accent,#4af);"' +
+        (isFirst ? ' checked' : '') + '>' +
+        '<div style="line-height:1.4;">' +
+        '<strong>' + weakIcon + ' ' + type.label + '</strong>' +
+        '<div style="font-size:0.83em;opacity:0.7;margin-top:2px;">' +
+        'Format: <code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;">' + type.format + '</code>' +
+        ' &nbsp;&middot;&nbsp; ~' + (type.possibleValues ?? 0).toLocaleString() + ' possible values' +
+        '</div>' +
+        '</div>';
+
+    card.querySelector('input').addEventListener('change', (function(t, c) {
+      return function() {
+        cards.querySelectorAll('label').forEach(function(l) {
+          l.style.borderColor = 'var(--border,#444)';
+          l.style.background  = '';
+        });
+        c.style.borderColor = 'var(--accent,#4af)';
+        c.style.background  = 'rgba(68,170,255,0.07)';
+        onPasswordTypeChange(t);
+      };
+    })(type, card));
+
+    cards.appendChild(card);
+  });
+
+  if (_passwordTypes.length > 0) onPasswordTypeChange(_passwordTypes[0]);
+  section.style.display = 'block';
+}
+
+function onPasswordTypeChange(type) {
+  selectedPasswordType = type;
+
+  var infoEl = document.getElementById('pwtype-info');
+  if (infoEl) {
+    var examples = (type.exampleValues || []).slice(0, 3)
+        .map(function(v) { return '<code>' + v + '</code>'; }).join(', ');
+    infoEl.innerHTML =
+        '<div style="padding:11px 14px;border-left:3px solid var(--accent,#4af);' +
+        'background:rgba(255,255,255,0.04);border-radius:0 6px 6px 0;font-size:0.88em;line-height:1.5;">' +
+        '<span>' + type.description + '</span>' +
+        (examples ? '<div style="margin-top:6px;opacity:0.75;">Examples: ' + examples + '</div>' : '') +
+        (type.crackingHint ? '<div style="margin-top:5px;color:#fa0;">&#x26A1; ' + type.crackingHint + '</div>' : '') +
+        '</div>';
+    infoEl.style.display = 'block';
+  }
+
+  var pwInput = document.getElementById('pw-input');
+  if (pwInput) {
+    var ex = type.exampleValues && type.exampleValues[0];
+    pwInput.placeholder = type.format + (ex ? '  e.g. ' + ex : '');
+  }
+
+  document.getElementById('pw-section').style.display = 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Spaces  —  /api/spaces  (fetched ONCE, result cached in _spaces)
+// ---------------------------------------------------------------------------
 async function loadSpaces() {
   try {
-    const res = await fetch('/api/spaces');
-    if (!res.ok) {
-      throw new Error('API returned status ' + res.status);
-    }
-    const spaces = await res.json(); // Backend returns direct array
-    if (!Array.isArray(spaces)) {
-      throw new Error('Invalid response format');
-    }
+    var res = await fetch('/api/spaces');
+    if (!res.ok) throw new Error('API returned status ' + res.status);
+    _spaces = await res.json();
+    if (!Array.isArray(_spaces)) throw new Error('Invalid response format');
 
-    const sel = document.getElementById('space-select');
+    var sel = document.getElementById('space-select');
 
-    if (spaces.length === 0) {
-      // No spaces available - show message and allow password entry anyway
-      const opt = document.createElement('option');
+    if (_spaces.length === 0) {
+      var opt = document.createElement('option');
       opt.value = 'default';
       opt.textContent = 'Default Space (No spaces configured)';
       sel.appendChild(opt);
       sel.value = 'default';
-      document.getElementById('pw-section').style.display = 'block';
       document.getElementById('space-info').innerHTML =
-          '<p style="color:#fa0;padding:8px;background:#1a1a0a;border-radius:4px;">⚠️ No spaces configured. Using default space.</p>';
+          '<p style="color:#fa0;padding:8px;background:#1a1a0a;border-radius:4px;">' +
+          '&#x26A0;&#xFE0F; No spaces configured. Using default space.</p>';
       document.getElementById('space-info').style.display = 'block';
+      renderPasswordTypeSection();
       return;
     }
 
-    spaces.forEach(s => {
-      const opt = document.createElement('option');
+    _spaces.forEach(function(s) {
+      var opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.name;
       sel.appendChild(opt);
     });
 
-    // Auto-select and auto-trigger if there is only one space
-    if (spaces.length === 1) {
-      sel.value = spaces[0].id;
+    if (_spaces.length === 1) {
+      sel.value = _spaces[0].id;
       await onSpaceChange();
-      // Hide space-info when only one space (no selection needed)
       document.getElementById('space-info').style.display = 'none';
     }
-  } catch(e) {
+  } catch (e) {
     console.error('Failed to load spaces:', e);
-    // Show error but still allow password entry
-    const sel = document.getElementById('space-select');
-    const opt = document.createElement('option');
+    var sel = document.getElementById('space-select');
+    var opt = document.createElement('option');
     opt.value = 'default';
     opt.textContent = 'Default Space (API Error)';
     sel.appendChild(opt);
     sel.value = 'default';
-    document.getElementById('pw-section').style.display = 'block';
     document.getElementById('space-info').innerHTML =
-        '<p style="color:#f00;padding:8px;background:#1a0a0a;border-radius:4px;">⚠️ Failed to load spaces: ' + e.message + '. Using default space.</p>';
+        '<p style="color:#f00;padding:8px;background:#1a0a0a;border-radius:4px;">' +
+        '&#x26A0;&#xFE0F; Failed to load spaces: ' + e.message + '. Using default space.</p>';
     document.getElementById('space-info').style.display = 'block';
+    renderPasswordTypeSection();
   }
 }
 
-// --- Space selection ---
+// Called when user picks a different space from the dropdown.
+// Uses cached _spaces — no second API call.
 async function onSpaceChange() {
-  const spaceId = document.getElementById('space-select').value;
+  var spaceId = document.getElementById('space-select').value;
+
   if (!spaceId) {
+    var pts = document.getElementById('pwtype-section');
+    if (pts) pts.style.display = 'none';
     document.getElementById('pw-section').style.display = 'none';
     return;
   }
 
-  // Always show password section when a space is selected
-  document.getElementById('pw-section').style.display = 'block';
+  // Hide password entry until a type is re-confirmed after space change
+  document.getElementById('pw-section').style.display = 'none';
 
-  // Check if only one space exists (hide info panel)
-  const res = await fetch('/api/spaces');
-  const spaces = await res.json();
-  if (spaces.length === 1) {
-    document.getElementById('space-info').style.display = 'none';
-    return;
-  }
-
-  // Try to fetch space details
-  try {
-    const space = spaces.find(s => s.id === spaceId);
+  // Show space info panel for multi-space setups — no fetch, uses _spaces cache
+  if (_spaces.length > 1) {
+    var space = _spaces.find(function(s) { return s.id === spaceId; });
     if (space) {
       renderSpaceInfo(space);
       document.getElementById('space-info').style.display = 'block';
-    } else if (spaceId === 'default') {
-      // Default space selected, already shown message
-    } else {
+    } else if (spaceId !== 'default') {
       document.getElementById('space-info').innerHTML =
           '<p style="color:#aaa;padding:8px;">Space information not available</p>';
       document.getElementById('space-info').style.display = 'block';
     }
-  } catch(e) {
-    // Space details failed but we can still proceed
-    console.error('Failed to fetch space details:', e);
   }
+
+  renderPasswordTypeSection();
 }
 
 function renderSpaceInfo(space) {
-  const el = document.getElementById('space-info');
-  el.innerHTML = `
-    <table class="info-table">
-      <tr><th>Space</th><td>${space.name}</td></tr>
-      <tr><th>Location</th><td>${space.location || '-'}</td></tr>
-      <tr><th>Description</th><td>${space.description || '-'}</td></tr>
-    </table>`;
+  var el = document.getElementById('space-info');
+  el.innerHTML =
+      '<table class="info-table">' +
+      '<tr><th>Space</th><td>' + space.name + '</td></tr>' +
+      '<tr><th>Location</th><td>' + (space.location || '-') + '</td></tr>' +
+      '<tr><th>Description</th><td>' + (space.description || '-') + '</td></tr>' +
+      '</table>';
   el.style.display = 'block';
 }
 
-// --- Hash password ---
+// ---------------------------------------------------------------------------
+// Hashing
+// ---------------------------------------------------------------------------
 async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  var msgBuffer  = new TextEncoder().encode(message);
+  var hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  return Array.from(new Uint8Array(hashBuffer))
+      .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
-// --- Collect metadata ---
+// ---------------------------------------------------------------------------
+// Client metadata
+// ---------------------------------------------------------------------------
 function collectMeta() {
-  const nav = navigator;
+  var nav = navigator;
   return {
-    userAgent: nav.userAgent,
-    language: nav.language,
-    languages: [...(nav.languages || [nav.language])],
-    platform: nav.platform,
-    cookieEnabled: nav.cookieEnabled,
-    doNotTrack: nav.doNotTrack,
-    screenWidth: screen.width,
-    screenHeight: screen.height,
-    screenDepth: screen.colorDepth,
-    devicePixelRatio: window.devicePixelRatio,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    timezoneOffset: new Date().getTimezoneOffset(),
+    userAgent:           nav.userAgent,
+    language:            nav.language,
+    languages:           Array.from(nav.languages || [nav.language]),
+    platform:            nav.platform,
+    cookieEnabled:       nav.cookieEnabled,
+    doNotTrack:          nav.doNotTrack,
+    screenWidth:         screen.width,
+    screenHeight:        screen.height,
+    screenDepth:         screen.colorDepth,
+    devicePixelRatio:    window.devicePixelRatio,
+    timezone:            Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezoneOffset:      new Date().getTimezoneOffset(),
     hardwareConcurrency: nav.hardwareConcurrency,
-    maxTouchPoints: nav.maxTouchPoints,
-    online: nav.onLine,
-    connection: nav.connection ? {type: nav.connection.effectiveType, downlink: nav.connection.downlink} : null,
-    windowWidth: window.innerWidth,
+    maxTouchPoints:      nav.maxTouchPoints,
+    online:              nav.onLine,
+    connection:          nav.connection
+        ? { type: nav.connection.effectiveType, downlink: nav.connection.downlink }
+        : null,
+    windowWidth:  window.innerWidth,
     windowHeight: window.innerHeight,
-    referrer: document.referrer,
-    submittedAt: new Date().toISOString()
+    referrer:     document.referrer,
+    submittedAt:  new Date().toISOString()
   };
 }
 
-// --- Meta disclosure panel ---
+// ---------------------------------------------------------------------------
+// Meta disclosure panel
+// ---------------------------------------------------------------------------
 function setupMetaDisclosure() {
-  const toggle = document.getElementById('meta-toggle');
-  const panel = document.getElementById('meta-panel');
+  var toggle = document.getElementById('meta-toggle');
+  var panel  = document.getElementById('meta-panel');
   if (!toggle || !panel) return;
-  toggle.addEventListener('click', () => {
-    const meta = collectMeta();
-    panel.textContent = JSON.stringify(meta, null, 2);
+  toggle.addEventListener('click', function() {
+    panel.textContent   = JSON.stringify(collectMeta(), null, 2);
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
 }
 
-// --- Submit ---
+// ---------------------------------------------------------------------------
+// Submit
+// ---------------------------------------------------------------------------
 async function onSubmit() {
-  const spaceId = document.getElementById('space-select').value;
-  const pw = document.getElementById('pw-input').value.trim();
-  const status = document.getElementById('status-msg');
+  var spaceId = document.getElementById('space-select').value;
+  var pw      = document.getElementById('pw-input').value.trim();
+  var status  = document.getElementById('status-msg');
 
   if (!spaceId) {
-    status.innerHTML = '<span style="color:#fa0">⚠️ Please select a space first.</span>';
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a space first.</span>';
+    return;
+  }
+  if (!selectedPasswordType) {
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a password type first.</span>';
     return;
   }
   if (!pw) {
-    status.innerHTML = '<span style="color:#fa0">⚠️ Please enter a password.</span>';
-    return;
-  }
-  if (!/^\d{8}$/.test(pw)) {
-    status.innerHTML = '<span style="color:#fa0">⚠️ Password must be 8 digits (DDMMYYYY).</span>';
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please enter a password.</span>';
     return;
   }
 
-  const hash = await sha256(pw);
-  const meta = collectMeta();
-  status.innerHTML = '<span style="color:#7af">📤 Submitting...</span>';
+  // Client-side format validation using the type's own regex
+  if (selectedPasswordType.regex) {
+    if (!new RegExp(selectedPasswordType.regex).test(pw)) {
+      var ex = selectedPasswordType.exampleValues && selectedPasswordType.exampleValues[0];
+      status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Format invalid for '
+          + '<strong>' + selectedPasswordType.label + '</strong>. '
+          + 'Expected: <code>' + selectedPasswordType.format + '</code>'
+          + (ex ? ' (e.g. <code>' + ex + '</code>)' : '') + '</span>';
+      return;
+    }
+  }
+
   document.getElementById('submit-btn').disabled = true;
+  status.innerHTML = '<span style="color:#7af">&#x1F4E4; Hashing&#x2026;</span>';
+
+  var hash = await sha256(pw);
+  var meta = collectMeta();
+
+  status.innerHTML = '<span style="color:#7af">&#x1F4E4; Submitting&#x2026;</span>';
 
   try {
-    const res = await fetch('/api/submit', {
+    var res = await fetch('/api/submit', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({spaceId, hash, meta})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spaceId: spaceId, hash: hash, passwordTypeId: selectedPasswordType.id, meta: meta })
     });
-    const data = await res.json();
+    var data = await res.json();
 
     if (res.status === 403) {
-      status.innerHTML = '<span style="color:#f00">🚫 ' + (data.error || 'Access denied.') + '</span><br>Your IP: ' + (data.ip || '');
+      status.innerHTML = '<span style="color:#f00">&#x1F6AB; ' + (data.error || 'Access denied.') + '</span>'
+          + (data.ip ? '<br>Your IP: ' + data.ip : '');
       document.getElementById('submit-btn').disabled = false;
     } else if (res.status === 429) {
-      status.innerHTML = '<span style="color:#f00">⚠️ ' + (data.error || 'Maximum submissions reached. No more passwords accepted.') + '</span>';
+      status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; ' + (data.error || 'Maximum submissions reached.') + '</span>';
     } else if (res.ok) {
-      status.innerHTML = '<span style="color:#0f0">✅ Hash submitted successfully!</span><br>Hash: <code>' + hash.substring(0,32) + '...</code>';
-      document.getElementById('pw-input').value = '';
-      document.getElementById('pw-input').disabled = true;
+      status.innerHTML = '<span style="color:#0f0">&#x2705; Hash submitted!</span><br>'
+          + 'Hash: <code>' + hash.substring(0, 32) + '&#x2026;</code>';
+      document.getElementById('pw-input').value     = '';
+      document.getElementById('pw-input').disabled  = true;
       document.getElementById('submit-btn').disabled = true;
     } else {
-      status.innerHTML = '<span style="color:#f00">❌ ' + (data.error || 'Submission failed.') + '</span>';
+      status.innerHTML = '<span style="color:#f00">&#x274C; ' + (data.error || 'Submission failed.') + '</span>';
       document.getElementById('submit-btn').disabled = false;
     }
-  } catch(e) {
-    status.innerHTML = '<span style="color:#f00">⚠️ Network error: ' + e.message + '</span>';
+  } catch (e) {
+    status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; Network error: ' + e.message + '</span>';
     document.getElementById('submit-btn').disabled = false;
   }
 }

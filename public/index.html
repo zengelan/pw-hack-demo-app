@@ -6,7 +6,274 @@
   <title>Password Security Demo</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+  <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+  <style>
+    /* Language selector in top right */
+    .language-selector {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .language-selector select {
+      padding: 8px 12px;
+      background: #1a1a1a;
+      border: 1px solid #4a4;
+      border-radius: 6px;
+      color: #eee;
+      font-size: 0.95em;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .language-selector select:hover {
+      background: #2a2a2a;
+      border-color: #6c6;
+    }
+    .language-selector select:focus {
+      outline: none;
+      border-color: #8f8;
+      box-shadow: 0 0 0 2px rgba(136, 255, 136, 0.2);
+    }
+
+    .input-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #pw-input {
+      flex: 1;
+      margin-bottom: 0 !important;
+    }
+    .calendar-btn {
+      padding: 0 16px;
+      background: #2a4a2a;
+      border: 1px solid #4a4;
+      border-radius: 6px;
+      color: #eee;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      transition: background 0.2s;
+    }
+    .calendar-btn:hover {
+      background: #3a5a3a;
+    }
+    .date-picker-section {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #2a4a2a;
+      border-radius: 8px;
+      background: #0d1a0d;
+    }
+    .hash-preview {
+      margin-top: 14px;
+      padding: 16px;
+      background: #0a0a1a;
+      border: 1px solid #334;
+      border-radius: 8px;
+      display: none;
+    }
+    .hash-preview.visible {
+      display: block;
+    }
+    .hash-value {
+      font-family: 'Courier New', monospace;
+      font-size: 1.15em;
+      font-weight: bold;
+      word-break: break-all;
+      color: #7af;
+      margin-top: 8px;
+      letter-spacing: 0.5px;
+      line-height: 1.4;
+    }
+    .fingerprint-text {
+      color: #aaa;
+      font-size: 1.05em;
+      line-height: 1.6;
+      margin-top: 12px;
+      font-weight: 500;
+    }
+    .hash-explainer {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid #3a3a1a;
+      border-radius: 8px;
+      background: #1a1a0a;
+      color: #bba;
+      line-height: 1.75;
+    }
+    .hash-explainer h3 {
+      color: #dd8;
+      margin-top: 0;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cow-story {
+      margin-top: 12px;
+      padding: 14px;
+      background: #111108;
+      border-left: 4px solid #aa6;
+      border-radius: 4px;
+      font-style: italic;
+      color: #cc9;
+    }
+    .project-explanation {
+      margin-top: 30px;
+      padding: 20px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #111;
+      border-top: 4px solid #444;
+    }
+    .project-explanation h2 {
+      margin-top: 0;
+      color: #eee;
+    }
+    .warning-box {
+      margin-top: 15px;
+      padding: 15px;
+      background: #2a0a0a;
+      border: 1px solid #5a1a1a;
+      border-radius: 6px;
+      color: #faa;
+    }
+    #hidden-picker {
+      position: absolute;
+      visibility: hidden;
+      width: 0;
+      height: 0;
+    }
+    .flatpickr-calendar {
+      background: #1a1a1a !important;
+    }
+    .flatpickr-day.flatpickr-disabled {
+      color: #444 !important;
+    }
+
+    /* Password Space Analysis */
+    .password-space-analysis {
+      margin-top: 30px;
+      padding: 24px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #0f0f0f;
+      border-top: 4px solid #555;
+    }
+    .password-space-analysis h2 {
+      margin-top: 0;
+      color: #eee;
+    }
+    .table-container {
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+    .password-space-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .password-space-table thead {
+      background: #2a2a2a;
+    }
+    .password-space-table th {
+      padding: 12px 10px;
+      text-align: left;
+      color: #eee;
+      font-weight: 600;
+      border-bottom: 2px solid #444;
+    }
+    .password-space-table td {
+      padding: 10px;
+      border-bottom: 1px solid #2a2a2a;
+      color: #ccc;
+    }
+    .password-space-table tbody tr:hover {
+      background: #252525;
+    }
+    .digit-count {
+      font-size: 0.85em;
+      color: #888;
+      font-style: italic;
+    }
+    .danger-extreme {
+      background: #2a0a0a !important;
+    }
+    .danger-extreme:hover {
+      background: #3a1a1a !important;
+    }
+    .danger-high {
+      background: #2a1500 !important;
+    }
+    .danger-high:hover {
+      background: #3a2510 !important;
+    }
+    .danger-medium {
+      background: #2a2000 !important;
+    }
+    .danger-medium:hover {
+      background: #3a3010 !important;
+    }
+    .danger-low {
+      background: #1a1a00 !important;
+    }
+    .danger-low:hover {
+      background: #2a2a10 !important;
+    }
+    .warning {
+      background: #1a1a0a !important;
+    }
+    .warning:hover {
+      background: #2a2a1a !important;
+    }
+    .safe {
+      background: #0a1a0a !important;
+    }
+    .safe:hover {
+      background: #1a2a1a !important;
+    }
+    .gpu-link {
+      color: #76b900;
+      text-decoration: none;
+      font-weight: 600;
+      position: relative;
+      border-bottom: 1px dotted #76b900;
+    }
+    .gpu-link:hover {
+      color: #a0e000;
+    }
+    .gpu-link:hover .gpu-tooltip {
+      display: block;
+    }
+    .gpu-tooltip {
+      display: none;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 100%;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #000;
+      border: 2px solid #76b900;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .gpu-image {
+      display: block;
+      width: 320px;
+      height: auto;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
 
@@ -28,7 +295,7 @@
   <!-- Step 1: Select Event / Classroom -->
   <div class="card">
     <h2 data-i18n="step1Title">Step 1: Select Your Event / Classroom</h2>
-    <p class="step-description" data-i18n="step1Description">
+    <p style="color:#aaa;margin-bottom:12px" data-i18n="step1Description">
       This demo is running as a <strong>live event</strong>. Your instructor has created a dedicated room (event) for your class session &mdash;
       multiple instructors may be running this demo simultaneously in different classrooms.
       Please select the <strong>correct event or room</strong> that matches your current class session.
@@ -39,10 +306,49 @@
     <div id="space-info"></div>
   </div>
 
-  <!-- Step 2: Enter Password -->
+  <!-- Step 2: Choose Password Type -->
+  <div id="pwtype-section" class="card" style="display:none;">
+    <h2 data-i18n="pwTypeTitle">&#x1F511; Step 2: Choose Your Password Type</h2>
+    <p class="step-description" data-i18n="pwTypeDescription">
+      Before you enter your password, tell the system what <strong>kind</strong> of password you are using.
+      The instructor&rsquo;s brute-force cracker uses this hint to pick the right <strong>search space</strong>
+      to iterate through &mdash; so please choose honestly!
+    </p>
+
+    <div class="hash-explainer" style="margin-top:0; margin-bottom:20px;">
+      <h3 style="color:#dd8; margin-top:0; display:flex; align-items:center; gap:8px;">
+        &#x1F4CA; Why Does Password Type Matter?
+      </h3>
+      <p>
+        Two passwords can produce completely different-looking SHA-256 hashes, yet one can be cracked in
+        <strong style="color:#f88;">milliseconds</strong> and the other would take
+        <strong style="color:#8f8;">millions of years</strong>.
+        The difference is not the hash algorithm &mdash; it is the <em>size of the search space</em>.
+      </p>
+      <div class="cow-story" style="font-style:normal;">
+        &#x1F50D; <strong>How the cracker works:</strong><br>
+        For a <em>birthday</em> there are only ~27,000 plausible dates. The cracker hashes every single one
+        in under 40&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password
+        there are 218 trillion possibilities &mdash; the same approach would take years.
+      </div>
+    </div>
+
+    <!-- Cards injected here by student.js renderPasswordTypeSection() -->
+    <div id="pwtype-cards" role="radiogroup" aria-label="Password type">
+      <!-- Loading placeholder -->
+      <div id="pwtype-loading" style="color:#888; font-size:0.9em; padding:12px 0;">
+        ⏳ Loading password types&hellip;
+      </div>
+    </div>
+
+    <!-- Detail panel for selected type, filled by onPasswordTypeChange() -->
+    <div id="pwtype-info" style="display:none; margin-top:12px;"></div>
+  </div>
+
+  <!-- Step 3: Enter Password -->
   <div id="pw-section" class="card">
-    <h2 data-i18n="step2Title">Step 2: Enter Your Birthday as Password</h2>
-    <p class="step-description" data-i18n="formatLabel">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998</p>
+    <h2 data-i18n="step3Title">Step 3: Enter Your Password</h2>
+    <p style="color:#aaa;margin-bottom:12px" data-i18n="formatLabel">Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998</p>
 
     <div class="input-row">
       <input type="text" id="pw-input" maxlength="8" placeholder="DDMMYYYY" autocomplete="off" inputmode="numeric" pattern="[0-9]{8}">
@@ -54,7 +360,7 @@
     <div class="date-picker-section">
       <!-- Live hash preview -->
       <div class="hash-preview" id="hash-preview">
-        <div class="hash-generated-label" data-i18n="hashGeneratedLabel">&#x26A1; SHA-256 Hash Generated:</div>
+        <div style="color:#8f8;font-size:0.95em;font-weight:600;" data-i18n="hashGeneratedLabel">&#x26A1; SHA-256 Hash Generated:</div>
         <div class="hash-value" id="hash-preview-value">...</div>
         <div class="fingerprint-text" data-i18n="fingerprintText">
           This 64-character string is the <strong>"fingerprint"</strong> of your password.
@@ -75,7 +381,7 @@
   <!-- Project Explanation Section -->
   <div class="project-explanation">
     <h2 data-i18n="aboutTitle">&#x1F4DA; About This Project</h2>
-    <p class="text-body" data-i18n="aboutDescription">
+    <p style="color:#bbb; line-height:1.6;" data-i18n="aboutDescription">
       This application is a security demonstration designed to show how authentication works in modern web apps &mdash; and why certain common practices are dangerous.
     </p>
 
@@ -92,7 +398,7 @@
         but <strong>absolutely impossible to reconstruct the original cow from the burger</strong>.
         Hashing is a one-way mathematical function designed exactly like this.
       </div>
-      <p class="mt-12" data-i18n="hashingFooter">
+      <p style="margin-top:12px;" data-i18n="hashingFooter">
         Your password is never sent to the server. Instead, your browser computes this one-way fingerprint &mdash; and only the hash is transmitted.
       </p>
     </div>
@@ -103,7 +409,7 @@
       Why? Because birthdays are <strong>predictable</strong>.</span>
     </div>
 
-    <p class="text-body mt-15" data-i18n="attackDescription">
+    <p style="color:#bbb; line-height:1.6; margin-top:15px;" data-i18n="attackDescription">
       An attacker doesn't need to "reverse" the hash. They just use a <strong>brute-force function</strong>:
       they take every possible date in a 100-year range (~36,500 dates), hash each one, and compare them to your hash.
       On a modern computer, this takes <strong>less than a second</strong>.
@@ -114,13 +420,13 @@
   <!-- Password Character Space Analysis -->
   <div class="password-space-analysis">
     <h2 data-i18n="passwordSpaceTitle">&#x1F522; Password Character Space &amp; Brute Force Times</h2>
-    <p class="text-body" style="margin-bottom:16px;" data-i18n="passwordSpaceIntro">
+    <p style="color:#bbb; line-height:1.6; margin-bottom:16px;" data-i18n="passwordSpaceIntro">
       The <strong>character space</strong> of a password is the total number of possible combinations an attacker must try
       to guarantee cracking it. This table shows various password types ranked by strength (weakest &rarr; strongest),
       the size of their character space, and how long a brute-force attack would take using two different methods:
     </p>
 
-    <ul class="method-list">
+    <ul style="color:#bbb; line-height:1.8; margin-bottom:20px;">
       <li data-i18n="browserMethod">
         <strong>Browser (1M hashes/sec):</strong>
         Using JavaScript in a web browser (SHA-256 via WebCrypto API)
@@ -131,13 +437,15 @@
              class="gpu-link" target="_blank" rel="noopener">
             GPU RTX 4090
             <span class="gpu-tooltip">
-              <img src="gpu.png" alt="NVIDIA RTX 4090" class="gpu-image">
-            </span>
+          <img src="gpu.png"
+               alt="NVIDIA RTX 4090" class="gpu-image">
+        </span>
           </a> (22B hashes/sec):
         </strong>
         Using a consumer GPU with hashcat for password cracking
       </li>
     </ul>
+
 
     <div class="table-container">
       <table class="password-space-table">
@@ -220,9 +528,9 @@
       </table>
     </div>
 
-    <div class="takeaways-box">
-      <h3 data-i18n="keyTakeawaysTitle">&#x1F4A1; Key Takeaways</h3>
-      <ul class="takeaways-list">
+    <div style="margin-top:24px; padding:18px; background:#1a1a0a; border:1px solid #3a3a1a; border-radius:8px;">
+      <h3 style="color:#dd8; margin-top:0;" data-i18n="keyTakeawaysTitle">&#x1F4A1; Key Takeaways</h3>
+      <ul style="color:#bba; line-height:1.8; margin:8px 0; padding-left:20px;">
         <li data-i18n="takeaway1"><strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser</li>
         <li data-i18n="takeaway2"><strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)</li>
         <li data-i18n="takeaway3"><strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU</li>
@@ -231,32 +539,28 @@
     </div>
   </div>
 
-</div><!-- /.container -->
-
-<!-- Version Footer -->
-<footer class="app-footer">
-  <span id="version-footer">ui: {{UI_VERSION}} &nbsp;|&nbsp; backend: …</span>
-</footer>
+</div>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
 <script src="js/translations.js"></script>
 <script src="js/student.js"></script>
-<script src="gpu-tooltip.js"></script>
 <script>
-  (function () {
-    // Language
+  (function() {
+    // Initialize language
     window.i18n.initLanguage();
     window.i18n.updatePageLanguage();
-    document.getElementById('lang-select').addEventListener('change', function (e) {
+
+    // Language selector handler
+    document.getElementById('lang-select').addEventListener('change', function(e) {
       window.i18n.setLanguage(e.target.value);
     });
 
-    var pwInput    = document.getElementById('pw-input');
-    var preview    = document.getElementById('hash-preview');
+    var pwInput = document.getElementById('pw-input');
+    var preview = document.getElementById('hash-preview');
     var previewVal = document.getElementById('hash-preview-value');
-    var trigger    = document.getElementById('calendar-trigger');
+    var trigger = document.getElementById('calendar-trigger');
 
     var BIRTHDAY_MIN_DATE = new Date(1900, 0, 1);
     var BIRTHDAY_MAX_DATE = new Date(2020, 11, 31);
@@ -272,23 +576,24 @@
       return date;
     }
 
-    var fp = flatpickr('#hidden-picker', {
+    var fp = flatpickr("#hidden-picker", {
       locale: window.i18n.getCurrentLanguage(),
-      dateFormat: 'dmY',
+      dateFormat: "dmY",
       allowInput: false,
       clickOpens: false,
-      position: 'auto center',
+      position: "auto center",
       minDate: BIRTHDAY_MIN_DATE,
       maxDate: BIRTHDAY_MAX_DATE,
       defaultDate: BIRTHDAY_MAX_DATE,
-      onReady: function (selectedDates, dateStr, instance) {
+      onReady: function(selectedDates, dateStr, instance) {
         var yearInput = instance.calendarContainer.querySelector('.cur-year');
         if (yearInput) yearInput.removeAttribute('readonly');
       },
-      onOpen: function (selectedDates, dateStr, instance) {
-        instance.jumpToDate(parseBirthdayInput(pwInput.value) || BIRTHDAY_MAX_DATE);
+      onOpen: function(selectedDates, dateStr, instance) {
+        var parsed = parseBirthdayInput(pwInput.value);
+        instance.jumpToDate(parsed || BIRTHDAY_MAX_DATE);
       },
-      onChange: function (selectedDates, dateStr) {
+      onChange: function(selectedDates, dateStr) {
         pwInput.value = dateStr;
         updateHash();
       }
@@ -296,16 +601,30 @@
 
     function syncPickerToInput() {
       var parsed = parseBirthdayInput(pwInput.value);
-      if (parsed) { fp.setDate(parsed, false); fp.jumpToDate(parsed); }
-      else         { fp.clear(false); fp.jumpToDate(BIRTHDAY_MAX_DATE); }
+      if (parsed) {
+        fp.setDate(parsed, false);
+        fp.jumpToDate(parsed);
+      } else {
+        fp.clear(false);
+        fp.jumpToDate(BIRTHDAY_MAX_DATE);
+      }
     }
 
-    trigger.addEventListener('click', function () { syncPickerToInput(); fp.open(); });
-    pwInput.addEventListener('input', function () { syncPickerToInput(); updateHash(); });
+    trigger.addEventListener('click', function() {
+      syncPickerToInput();
+      fp.open();
+    });
+
+    pwInput.addEventListener('input', function() {
+      syncPickerToInput();
+      updateHash();
+    });
 
     async function updateHash() {
-      if (pwInput.value.length === 8) {
-        previewVal.textContent = await sha256(pwInput.value);
+      var val = pwInput.value;
+      if (val.length === 8) {
+        var hash = await sha256(val);
+        previewVal.textContent = hash;
         preview.classList.add('visible');
       } else {
         preview.classList.remove('visible');
@@ -313,29 +632,32 @@
     }
 
     async function sha256(message) {
-      var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
-      return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      var msgBuffer = new TextEncoder().encode(message);
+      var hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      var hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
     }
   })();
 </script>
-<script>
-  Promise.all([
-    fetch('/build-info.json', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-    fetch('/api/version').then(r => r.json()).catch(() => null)
-  ]).then(([ui, backend]) => {
-    const el = document.getElementById('version-footer');
-    if (!el) return;
-    const uiBranch  = ui?.branch  ?? '?';
-    const uiCommit  = ui?.commit  ?? '?';
-    const uiBuilt   = ui?.builtAt ? new Date(ui.builtAt).toLocaleString() : '?';
-    const beVersion = backend?.version ?? 'unavailable';
-    const beBranch  = backend?.branch  ?? '';
-    el.innerHTML =
-            `🖥 UI: <strong>${uiBranch}</strong> @ <code>${uiCommit}</code> (${uiBuilt})` +
-            `&nbsp;&nbsp;⚙️ Backend: <strong>${beVersion}</strong>${beBranch ? ' / ' + beBranch : ''}`;
-  });
-</script>
 
+<!-- Version Footer -->
+<footer style="text-align:center;padding:12px 0 8px;margin-top:32px;border-top:1px solid #222;">
+  <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: {{UI_VERSION}} &nbsp;|&nbsp; backend: …</span>
+</footer>
+<script>
+  (function() {
+    fetch('/api/version')
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              var el = document.getElementById('version-footer');
+              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: ' + (d.version || '?') + (d.branch ? ' (' + d.branch + ')' : '');
+            })
+            .catch(function(){
+              var el = document.getElementById('version-footer');
+              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: unavailable';
+            });
+  })();
+</script>
 
 </body>
 </html>
