@@ -5,6 +5,7 @@ const MAX_SUBMISSIONS = 25;
 let selectedPasswordType = null;
 let _passwordTypes = [];
 let _spaces        = []; // fetched once by loadSpaces(), reused by onSpaceChange()
+let isSubmittingHash = false; // Track if user is submitting a hash directly
 
 // ---------------------------------------------------------------------------
 // Boot sequence
@@ -28,6 +29,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('pw-input')
       .addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
+
+  // Add real-time validation for password input
+  document.getElementById('pw-input')
+      .addEventListener('input', onPasswordInput);
 
   // pw-type radio listeners are added dynamically in renderPasswordTypeSection()
 });
@@ -139,7 +144,79 @@ function onPasswordTypeChange(type) {
     pwInput.placeholder = type.format + (ex ? '  e.g. ' + ex : '');
   }
 
+  // Clear any existing validation errors when type changes
+  var status = document.getElementById('status-msg');
+  if (status) status.innerHTML = '';
+
   document.getElementById('pw-section').style.display = 'block';
+}
+
+// ---------------------------------------------------------------------------
+// Real-time password validation
+// ---------------------------------------------------------------------------
+function onPasswordInput() {
+  var pwInput = document.getElementById('pw-input');
+  var pw = pwInput.value.trim();
+  var status = document.getElementById('status-msg');
+  var preview = document.getElementById('hash-preview');
+
+  // Clear status on input change
+  status.innerHTML = '';
+
+  // If empty, hide preview and clear errors
+  if (!pw) {
+    preview.classList.remove('visible');
+    return;
+  }
+
+  // Check if input looks like a hash (64 hex characters)
+  var hashPattern = /^[a-fA-F0-9]{64}$/;
+  if (hashPattern.test(pw)) {
+    // User entered a hash - don't validate format, don't show preview
+    preview.classList.remove('visible');
+    isSubmittingHash = true;
+    return;
+  }
+
+  isSubmittingHash = false;
+
+  // Validate password format based on selected type
+  if (selectedPasswordType && selectedPasswordType.regex) {
+    var regex = new RegExp(selectedPasswordType.regex);
+    if (!regex.test(pw)) {
+      var ex = selectedPasswordType.exampleValues && selectedPasswordType.exampleValues[0];
+      status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusInvalidFormat') + ' '
+          + '<strong>' + selectedPasswordType.label + '</strong>. '
+          + window.i18n.t('statusExpected') + ' <code>' + selectedPasswordType.format + '</code>'
+          + (ex ? ' (e.g. <code>' + ex + '</code>)' : '') + '</span>';
+      preview.classList.remove('visible');
+      return;
+    }
+  }
+
+  // Valid password - update hash preview
+  updateHashPreview(pw);
+}
+
+// ---------------------------------------------------------------------------
+// Hash preview update
+// ---------------------------------------------------------------------------
+async function updateHashPreview(password) {
+  var preview = document.getElementById('hash-preview');
+  var previewVal = document.getElementById('hash-preview-value');
+
+  if (password && !isSubmittingHash) {
+    try {
+      var hash = await sha256(password);
+      previewVal.textContent = hash;
+      preview.classList.add('visible');
+    } catch (e) {
+      console.error('Error generating hash:', e);
+      preview.classList.remove('visible');
+    }
+  } else {
+    preview.classList.remove('visible');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -301,15 +378,23 @@ async function onSubmit() {
   var status  = document.getElementById('status-msg');
 
   if (!spaceId) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a space first.</span>';
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusSelectSpace') + '</span>';
     return;
   }
   if (!selectedPasswordType) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please select a password type first.</span>';
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusSelectPasswordType') + '</span>';
     return;
   }
   if (!pw) {
-    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Please enter a password.</span>';
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusEnterPassword') + '</span>';
+    return;
+  }
+
+  // Check if user is trying to submit a hash directly
+  var hashPattern = /^[a-fA-F0-9]{64}$/;
+  if (hashPattern.test(pw)) {
+    // This is a hash - validate it properly
+    status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusHashInvalidFormat') + '</span>';
     return;
   }
 
@@ -317,9 +402,9 @@ async function onSubmit() {
   if (selectedPasswordType.regex) {
     if (!new RegExp(selectedPasswordType.regex).test(pw)) {
       var ex = selectedPasswordType.exampleValues && selectedPasswordType.exampleValues[0];
-      status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; Format invalid for '
+      status.innerHTML = '<span style="color:#fa0">&#x26A0;&#xFE0F; ' + window.i18n.t('statusInvalidFormat') + ' '
           + '<strong>' + selectedPasswordType.label + '</strong>. '
-          + 'Expected: <code>' + selectedPasswordType.format + '</code>'
+          + window.i18n.t('statusExpected') + ' <code>' + selectedPasswordType.format + '</code>'
           + (ex ? ' (e.g. <code>' + ex + '</code>)' : '') + '</span>';
       return;
     }
@@ -331,7 +416,7 @@ async function onSubmit() {
   var hash = await sha256(pw);
   var meta = collectMeta();
 
-  status.innerHTML = '<span style="color:#7af">&#x1F4E4; Submitting&#x2026;</span>';
+  status.innerHTML = '<span style="color:#7af">&#x1F4E4; ' + window.i18n.t('statusSubmitting') + '</span>';
 
   try {
     var res = await fetch('/api/submit', {
@@ -342,23 +427,23 @@ async function onSubmit() {
     var data = await res.json();
 
     if (res.status === 403) {
-      status.innerHTML = '<span style="color:#f00">&#x1F6AB; ' + (data.error || 'Access denied.') + '</span>'
-          + (data.ip ? '<br>Your IP: ' + data.ip : '');
+      status.innerHTML = '<span style="color:#f00">&#x1F6AB; ' + (data.error || window.i18n.t('statusAccessDenied')) + '</span>'
+          + (data.ip ? '<br>' + window.i18n.t('statusYourIP') + data.ip : '');
       document.getElementById('submit-btn').disabled = false;
     } else if (res.status === 429) {
-      status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; ' + (data.error || 'Maximum submissions reached.') + '</span>';
+      status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; ' + (data.error || window.i18n.t('statusMaxSubmissions')) + '</span>';
     } else if (res.ok) {
-      status.innerHTML = '<span style="color:#0f0">&#x2705; Hash submitted!</span><br>'
-          + 'Hash: <code>' + hash.substring(0, 32) + '&#x2026;</code>';
+      status.innerHTML = '<span style="color:#0f0">&#x2705; ' + window.i18n.t('statusSuccess') + '</span><br>'
+          + window.i18n.t('statusHash') + '<code>' + hash.substring(0, 32) + '&#x2026;</code>';
       document.getElementById('pw-input').value     = '';
       document.getElementById('pw-input').disabled  = true;
       document.getElementById('submit-btn').disabled = true;
     } else {
-      status.innerHTML = '<span style="color:#f00">&#x274C; ' + (data.error || 'Submission failed.') + '</span>';
+      status.innerHTML = '<span style="color:#f00">&#x274C; ' + (data.error || window.i18n.t('statusFailed')) + '</span>';
       document.getElementById('submit-btn').disabled = false;
     }
   } catch (e) {
-    status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; Network error: ' + e.message + '</span>';
+    status.innerHTML = '<span style="color:#f00">&#x26A0;&#xFE0F; ' + window.i18n.t('statusNetworkError') + e.message + '</span>';
     document.getElementById('submit-btn').disabled = false;
   }
 }
