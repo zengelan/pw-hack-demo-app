@@ -55,7 +55,7 @@ async function loadPasswordTypes() {
       label: 'Birthday (DDMMYYYY)',
       description: 'An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.',
       format: 'DDMMYYYY',
-      regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|200[0-9])$',
+      regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-9])$',
       possibleValues: 26645,
       exampleValues: ['01011990', '24121985', '07031975'],
       crackingHint: 'Brute-forceable in milliseconds — only ~27k valid calendar dates.',
