@@ -11,8 +11,12 @@ const translations = {
     step1Description: "This demo is running as a <strong>live event</strong>. Your instructor has created a dedicated room (event) for your class session &mdash; multiple instructors may be running this demo simultaneously in different classrooms. Please select the <strong>correct event or room</strong> that matches your current class session.",
     selectPlaceholder: "-- Select your event / classroom --",
     
-    // Step 2
-    step2Title: "Step 2: Enter Your Birthday as Password",
+    // Step 2 - Password Type
+    pwTypeTitle: "&#x1F511; Step 2: Choose Your Password Type",
+    pwTypeDescription: "Before you enter your password, tell the system what <strong>kind</strong> of password you are using. The instructor&rsquo;s brute-force cracker uses this hint to pick the right <strong>search space</strong> to iterate through &mdash; so please choose honestly!",
+    
+    // Step 3
+    step3Title: "Step 3: Enter Your Password",
     formatLabel: "Format: <strong>DDMMYYYY</strong> &nbsp; Example: 15031998",
     passwordPlaceholder: "DDMMYYYY",
     calendarTooltip: "Open Date Picker",
@@ -88,8 +92,13 @@ const translations = {
     
     // Status messages
     statusSelectSpace: "Please select a space first.",
+    statusSelectPasswordType: "Please select a password type first.",
     statusEnterPassword: "Please enter a password.",
     statusInvalid8Digits: "Password must be 8 digits (DDMMYYYY).",
+    statusInvalidFormat: "Format invalid for",
+    statusExpected: "Expected:",
+    statusInvalidHash: "Invalid hash format. Please enter a valid password, not a hash.",
+    statusHashInvalidFormat: "Invalid hash format. Expected a 64-character hexadecimal string.",
     statusSubmitting: "Submitting...",
     statusAccessDenied: "Access denied.",
     statusYourIP: "Your IP: ",
@@ -115,8 +124,12 @@ const translations = {
     step1Description: "Diese Demo läuft als <strong>Live-Event</strong>. Dein Dozent hat einen dedizierten Raum (Event) für deine Unterrichtsstunde erstellt &mdash; mehrere Dozenten können diese Demo gleichzeitig in verschiedenen Klassenzimmern durchführen. Bitte wähle das <strong>richtige Event oder den richtigen Raum</strong>, der zu deiner aktuellen Unterrichtsstunde passt.",
     selectPlaceholder: "-- Wähle dein Event / Klassenzimmer --",
     
-    // Step 2
-    step2Title: "Schritt 2: Gib dein Geburtsdatum als Passwort ein",
+    // Step 2 - Password Type
+    pwTypeTitle: "&#x1F511; Schritt 2: Wähle deinen Passworttyp",
+    pwTypeDescription: "Bevor du dein Passwort eingibst, teile dem System mit, welche <strong>Art</strong> von Passwort du verwendest. Der Brute-Force-Cracker des Dozenten nutzt diesen Hinweis, um den richtigen <strong>Suchraum</strong> zu durchlaufen &mdash; bitte wähle ehrlich!",
+    
+    // Step 3
+    step3Title: "Schritt 3: Gib dein Passwort ein",
     formatLabel: "Format: <strong>TTMMJJJJ</strong> &nbsp; Beispiel: 15031998",
     passwordPlaceholder: "TTMMJJJJ",
     calendarTooltip: "Datumsauswahl öffnen",
@@ -192,8 +205,13 @@ const translations = {
     
     // Status messages
     statusSelectSpace: "Bitte wähle zuerst einen Raum.",
+    statusSelectPasswordType: "Bitte wähle zuerst einen Passworttyp.",
     statusEnterPassword: "Bitte gib ein Passwort ein.",
     statusInvalid8Digits: "Passwort muss 8 Ziffern sein (TTMMJJJJ).",
+    statusInvalidFormat: "Format ungültig für",
+    statusExpected: "Erwartet:",
+    statusInvalidHash: "Ungültiges Hash-Format. Bitte gib ein gültiges Passwort ein, keinen Hash.",
+    statusHashInvalidFormat: "Ungültiges Hash-Format. Erwartet wird eine 64-stellige Hexadezimalzahl.",
     statusSubmitting: "Wird gesendet...",
     statusAccessDenied: "Zugriff verweigert.",
     statusYourIP: "Deine IP: ",
@@ -251,8 +269,12 @@ function updatePageLanguage() {
   const selectPlaceholder = document.querySelector('#space-select option[value=""]');
   if (selectPlaceholder) selectPlaceholder.textContent = t('selectPlaceholder');
   
-  // Update Step 2
-  updateElement('[data-i18n="step2Title"]', t('step2Title'));
+  // Update Step 2 - Password Type
+  updateElement('[data-i18n="pwTypeTitle"]', t('pwTypeTitle'));
+  updateElement('[data-i18n="pwTypeDescription"]', t('pwTypeDescription'));
+  
+  // Update Step 3
+  updateElement('[data-i18n="step3Title"]', t('step3Title'));
   updateElement('[data-i18n="formatLabel"]', t('formatLabel'));
   
   const pwInput = document.getElementById('pw-input');
