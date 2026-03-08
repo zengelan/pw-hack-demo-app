@@ -9,9 +9,10 @@ async function apiFetch(path,opts={}){
   }
 }
 export const api={
+  getPasswordTypes:()=>apiFetch('api/password-types'),
   getHashes:()=>apiFetch('api/hashes'),
   getMyIp:()=>apiFetch('api/myip'),
-  submit:(hash,spaceId,meta)=>apiFetch('api/submit',{method:'POST',body:JSON.stringify({hash,spaceId,meta})}),
+  submit:(hash,spaceId,passwordTypeId,meta)=>apiFetch('api/submit',{method:'POST',body:JSON.stringify({hash,spaceId,passwordTypeId,meta})}),
   updateHash:(id,password,attempts)=>apiFetch('api/hash/'+id,{method:'POST',body:JSON.stringify({password,attempts})}),
   deleteHash:(id)=>apiFetch('api/hash/'+id,{method:'DELETE'}),
   clearAll:()=>apiFetch('api/clear',{method:'POST'}),
