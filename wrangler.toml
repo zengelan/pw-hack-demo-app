@@ -6,6 +6,7 @@ routes          = [{ pattern = "pw-hack-demo.apps.zengel.cloud/*", zone_name = "
 
 [vars]
 APP_VERSION = "v0.0.1"
+APP_BRANCH = "main"
 
 [assets]
 directory = "./public"
