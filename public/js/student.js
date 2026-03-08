@@ -138,10 +138,47 @@ function onPasswordTypeChange(type) {
     infoEl.style.display = 'block';
   }
 
+  // Update the format label
+  var formatLabel = document.getElementById('pw-format-label');
+  if (formatLabel) {
+    var ex = type.exampleValues && type.exampleValues[0];
+    formatLabel.innerHTML = 'Format: <strong>' + type.format + '</strong> &nbsp; Example: ' + (ex || 'N/A');
+  }
+
+  // Update input placeholder and attributes
   var pwInput = document.getElementById('pw-input');
   if (pwInput) {
     var ex = type.exampleValues && type.exampleValues[0];
     pwInput.placeholder = type.format + (ex ? '  e.g. ' + ex : '');
+    
+    // Update input attributes based on password type
+    // Remove old attributes
+    pwInput.removeAttribute('maxlength');
+    pwInput.removeAttribute('inputmode');
+    pwInput.removeAttribute('pattern');
+    
+    // Set new attributes based on type
+    if (type.id === 'birthday_ddmmyyyy') {
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'numeric');
+      pwInput.setAttribute('pattern', '[0-9]{8}');
+    } else if (type.format) {
+      // Infer max length from format string (count placeholders)
+      var formatLen = type.format.replace(/[^a-zA-Z0-9]/g, '').length;
+      if (formatLen > 0) {
+        pwInput.setAttribute('maxlength', formatLen.toString());
+      }
+    }
+  }
+
+  // Show/hide calendar button based on password type
+  var calendarBtn = document.getElementById('calendar-trigger');
+  if (calendarBtn) {
+    if (type.id === 'birthday_ddmmyyyy') {
+      calendarBtn.classList.remove('hidden');
+    } else {
+      calendarBtn.classList.add('hidden');
+    }
   }
 
   // Clear any existing validation errors when type changes
