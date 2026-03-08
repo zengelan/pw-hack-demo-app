@@ -3,6 +3,9 @@
 # This workflow automatically deploys the backend worker to Cloudflare.
 # By default, it triggers on changes to worker.mjs for continuous deployment.
 # Alternative mode: Deploy only on release tags (see commented section below).
+# 
+# Note: This workflow deploys ONLY the worker code. HTML pages are deployed
+# separately via the deploy_pages workflow and are not included in this deployment.
 
 name: Deploy Backend to Cloudflare Workers
 
@@ -15,8 +18,8 @@ on:
 
 # ALTERNATIVE MODE: Deploy only on releases/tags
 # To switch modes:
-# 1. Comment out the 'push' block above (lines 10-13)
-# 2. Uncomment the block below (lines 19-23)
+# 1. Comment out the 'push' block above (lines 13-16)
+# 2. Uncomment the block below (lines 22-26)
 # This mode deploys only when a new release is published or a version tag is pushed
 #  push:
 #    tags:
@@ -82,9 +85,11 @@ jobs:
           echo "--- wrangler.toml [vars] after patch ---"
           grep -A5 '\[vars\]' wrangler.toml
 
-      # Step 6: Deploy to Cloudflare Workers
+      # Step 6: Deploy to Cloudflare Workers (worker code only, no assets)
       # Uses official Cloudflare Wrangler action with credentials from repository secrets
       # Secrets required: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+      # Note: The wrangler.toml config no longer includes [assets] section,
+      # ensuring HTML pages are NOT uploaded during worker deployment
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
