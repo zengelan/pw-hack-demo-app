@@ -593,7 +593,7 @@
   
 <!-- Version Footer -->
 <footer style="text-align:center;padding:12px 0 8px;margin-top:32px;border-top:1px solid #222;">
-  <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: v0.0.1 &nbsp;|&nbsp; backend: …</span>
+  <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: {{UI_VERSION}} &nbsp;|&nbsp; backend: …</span>
 </footer>
 <script>
 (function() {
@@ -601,11 +601,11 @@
     .then(function(r){ return r.json(); })
     .then(function(d){
       var el = document.getElementById('version-footer');
-      if(el) el.textContent = 'ui: v0.0.1  |  backend: ' + (d.version || '?');
+      if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: ' + (d.version || '?') + (d.branch ? ' (' + d.branch + ')' : '');
     })
     .catch(function(){
       var el = document.getElementById('version-footer');
-      if(el) el.textContent = 'ui: v0.0.1  |  backend: unavailable';
+      if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: unavailable';
     });
 })();
 </script>
