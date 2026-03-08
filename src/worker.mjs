@@ -8,6 +8,7 @@ let _ac=null,_at=0,_hc=null,_ht=0;
 
 // --- Index management (replaces KV list() calls) ---
 async function getIndex(env){
+    if(!env?.PWDEMOAPPHASHES)return[];
   const raw=await env.PWDEMOAPPHASHES.get(INDEX_KEY);
   if(!raw)return[];
   try{const ids=JSON.parse(raw);return Array.isArray(ids)?ids.filter(id=>!id.startsWith("rl:")):[];
