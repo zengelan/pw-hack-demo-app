@@ -2,10 +2,15 @@ name: Deploy Backend to Cloudflare Workers
 
 on:
   push:
-    tags:
-      - 'v*'
-  release:
-    types: [published]
+    paths:
+      - 'worker.mjs'
+# To deploy only on releases/tags instead of every worker.mjs change, 
+# comment out the 'push' block above and uncomment the block below:
+#  push:
+#    tags:
+#      - 'v*'
+#  release:
+#    types: [published]
 
 jobs:
   deploy:
