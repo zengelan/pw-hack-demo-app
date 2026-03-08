@@ -13,6 +13,8 @@ jobs:
     name: Deploy Worker
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -21,6 +23,28 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Resolve version and branch
+        id: version
+        run: |
+          # Git tag (e.g. v0.0.4) - use tag if triggered by tag push, else latest tag
+          GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || echo "untagged")
+          # Branch name - GITHUB_REF_NAME is the tag name on tag push; resolve actual branch
+          GIT_BRANCH=$(git branch -r --contains HEAD | grep -v HEAD | sed 's|origin/||' | tr -d ' ' | head -1 || echo "main")
+          # On a tag push, GITHUB_REF_NAME is the tag - find the branch the tag was created on
+          if [ -z "$GIT_BRANCH" ]; then
+            GIT_BRANCH="main"
+          fi
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT
+          echo "GIT_BRANCH=$GIT_BRANCH" >> $GITHUB_OUTPUT
+          echo "Deploying tag=$GIT_TAG branch=$GIT_BRANCH"
+
+      - name: Patch wrangler.toml with dynamic version and branch
+        run: |
+          sed -i "s|^APP_VERSION = .*|APP_VERSION = \"${{ steps.version.outputs.GIT_TAG }}\"|" wrangler.toml
+          sed -i "s|^APP_BRANCH = .*|APP_BRANCH = \"${{ steps.version.outputs.GIT_BRANCH }}\"|" wrangler.toml
+          echo "--- wrangler.toml [vars] after patch ---"
+          grep -A5 '\[vars\]' wrangler.toml
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
