@@ -9,9 +9,6 @@ APP_VERSION = "v0.0.1"
 APP_BRANCH = "main"
 APP_COMMIT = "0000000"
 
-[assets]
-directory = "./public"
-
 [[kv_namespaces]]
 binding = "PWDEMOAPPHASHES"
 id      = "31d012e28d2245aa8ca5d8a393bad836"
