@@ -56,9 +56,9 @@ async function loadPasswordTypes() {
       description: 'An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.',
       format: 'DDMMYYYY',
       regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-6])$',
-      possibleValues: 26645,
+      possibleValues: 38797,
       exampleValues: ['01011990', '24121985', '07031975'],
-      crackingHint: 'Brute-forceable in milliseconds — only ~27k valid calendar dates.',
+      crackingHint: 'Brute-forceable in milliseconds — only ~39k valid calendar dates.',
       weaknessLevel: 'very_high'
     }];
   }
@@ -151,23 +151,41 @@ function onPasswordTypeChange(type) {
     var ex = type.exampleValues && type.exampleValues[0];
     pwInput.placeholder = type.format + (ex ? '  e.g. ' + ex : '');
     
-    // Update input attributes based on password type
+    // Clear the input when switching types
+    pwInput.value = '';
+    
     // Remove old attributes
     pwInput.removeAttribute('maxlength');
     pwInput.removeAttribute('inputmode');
     pwInput.removeAttribute('pattern');
+    pwInput.removeAttribute('autocomplete');
+    pwInput.removeAttribute('autocapitalize');
+    pwInput.removeAttribute('spellcheck');
     
-    // Set new attributes based on type
+    // Set attributes based on password type
     if (type.id === 'birthday_ddmmyyyy') {
+      // Birthday: numeric only, 8 digits
       pwInput.setAttribute('maxlength', '8');
       pwInput.setAttribute('inputmode', 'numeric');
       pwInput.setAttribute('pattern', '[0-9]{8}');
-    } else if (type.format) {
-      // Infer max length from format string (count placeholders)
-      var formatLen = type.format.replace(/[^a-zA-Z0-9]/g, '').length;
-      if (formatLen > 0) {
-        pwInput.setAttribute('maxlength', formatLen.toString());
-      }
+      pwInput.setAttribute('autocomplete', 'off');
+    } else if (type.id === 'digits8') {
+      // 8-digit PIN: numeric only
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'numeric');
+      pwInput.setAttribute('pattern', '[0-9]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+    } else if (type.id === 'lowercase8') {
+      // Lowercase letters: text, 8 chars, no caps/autocorrect
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'text');
+      pwInput.setAttribute('pattern', '[a-z]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+      pwInput.setAttribute('autocapitalize', 'none');
+      pwInput.setAttribute('spellcheck', 'false');
+    } else if (type.length) {
+      // Generic: infer from length property
+      pwInput.setAttribute('maxlength', type.length.toString());
     }
   }
 
@@ -184,6 +202,10 @@ function onPasswordTypeChange(type) {
   // Clear any existing validation errors when type changes
   var status = document.getElementById('status-msg');
   if (status) status.innerHTML = '';
+
+  // Clear hash preview
+  var preview = document.getElementById('hash-preview');
+  if (preview) preview.classList.remove('visible');
 
   document.getElementById('pw-section').style.display = 'block';
 }
