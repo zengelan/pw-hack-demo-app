@@ -1,49 +1,75 @@
+# GitHub Action: Deploy Backend to Cloudflare Workers
+# 
+# This workflow automatically deploys the backend worker to Cloudflare.
+# By default, it triggers on changes to worker.mjs for continuous deployment.
+# Alternative mode: Deploy only on release tags (see commented section below).
+
 name: Deploy Backend to Cloudflare Workers
 
 on:
+  # CURRENT MODE: Deploy on every push that changes worker.mjs
+  # This ensures the latest backend code is always deployed automatically
   push:
     paths:
       - 'worker.mjs'
-# To deploy only on releases/tags instead of every worker.mjs change, 
-# comment out the 'push' block above and uncomment the block below:
+
+# ALTERNATIVE MODE: Deploy only on releases/tags
+# To switch modes:
+# 1. Comment out the 'push' block above (lines 10-13)
+# 2. Uncomment the block below (lines 19-23)
+# This mode deploys only when a new release is published or a version tag is pushed
 #  push:
 #    tags:
-#      - 'v*'
+#      - 'v*'  # Triggers on version tags like v1.0.0, v0.0.4, etc.
 #  release:
-#    types: [published]
+#    types: [published]  # Triggers when a GitHub release is published
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Deploy Worker
     steps:
+      # Step 1: Checkout the repository with full git history
+      # fetch-depth: 0 ensures we get all tags and branches for version resolution
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Step 2: Setup Node.js environment
+      # Using Node.js 20 LTS for consistency with Cloudflare Workers runtime
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      # Step 3: Install project dependencies
+      # Required for Wrangler CLI and any npm packages used by the worker
       - name: Install dependencies
         run: npm install
 
+      # Step 4: Resolve version tag and branch name
+      # Extracts git metadata to embed into the deployed worker
+      # GIT_TAG: Latest version tag (e.g., v0.0.4) or "untagged" if none exists
+      # GIT_BRANCH: Current branch name, defaulting to "main" if not detected
       - name: Resolve version and branch
         id: version
         run: |
-          # Git tag (e.g. v0.0.4) - use tag if triggered by tag push, else latest tag
+          # Try to get exact tag for current commit, fallback to latest tag, or "untagged"
           GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || echo "untagged")
-          # Branch name - GITHUB_REF_NAME is the tag name on tag push; resolve actual branch
+          # Find the branch containing HEAD, excluding detached HEAD states
           GIT_BRANCH=$(git branch -r --contains HEAD | grep -v HEAD | sed 's|origin/||' | tr -d ' ' | head -1 || echo "main")
-          # On a tag push, GITHUB_REF_NAME is the tag - find the branch the tag was created on
+          # Fallback to main branch if detection fails
           if [ -z "$GIT_BRANCH" ]; then
             GIT_BRANCH="main"
           fi
+          # Export values for use in subsequent steps
           echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT
           echo "GIT_BRANCH=$GIT_BRANCH" >> $GITHUB_OUTPUT
           echo "Deploying tag=$GIT_TAG branch=$GIT_BRANCH"
 
+      # Step 5: Inject version metadata into wrangler.toml
+      # Updates APP_VERSION and APP_BRANCH variables in the config file
+      # This allows the worker to expose version info via API endpoints
       - name: Patch wrangler.toml with dynamic version and branch
         run: |
           sed -i "s|^APP_VERSION = .*|APP_VERSION = \"${{ steps.version.outputs.GIT_TAG }}\"|" wrangler.toml
@@ -51,6 +77,9 @@ jobs:
           echo "--- wrangler.toml [vars] after patch ---"
           grep -A5 '\[vars\]' wrangler.toml
 
+      # Step 6: Deploy to Cloudflare Workers
+      # Uses official Cloudflare Wrangler action with credentials from repository secrets
+      # Secrets required: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
