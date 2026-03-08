@@ -92,7 +92,8 @@ async function getIndex() {
 }
 
 async function saveIndex(ids) {
-  if (KV_HASHES) await KV_HASHES.put(INDEX_KEY, JSON.stringify(ids), {expirationTtl:7200});
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
+  await KV_HASHES.put(INDEX_KEY, JSON.stringify(ids), {expirationTtl:7200});
 }
 
 async function addToIndex(id) {
@@ -153,6 +154,7 @@ async function rateLimited(ip) {
   if (!KV_HASHES) return false;
   const k = "rl:" + ip, l = await KV_HASHES.get(k);
   if (l && Date.now() - +l < RATE_LIMIT_MS) return true;
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
   await KV_HASHES.put(k, String(Date.now()), {expirationTtl:60});
   return false;
 }
@@ -279,6 +281,7 @@ async function submit(req, env) {
       client: body.meta ?? {}
     }
   };
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
   await KV_HASHES.put(id, JSON.stringify(entry), {expirationTtl:7200});
   await addToIndex(id);
   return json({id, success: true, slotsLeft: MAX_HASHES - (idx.length + 1)});
@@ -301,6 +304,7 @@ async function updateHash(req, id) {
   const entry = JSON.parse(e.value);
   const b = await req.json().catch(() => ({}));
   const updated = {...entry, cracked: true, password: esc(b.password ?? ""), attempts: b.attempts ?? 0, crackedAt: Date.now()};
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
   await KV_HASHES.put(id, JSON.stringify(updated), {expirationTtl:7200});
   return json({success: true});
 }
