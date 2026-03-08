@@ -1,7 +1,7 @@
 const APP_VERSION="v0.0.1";
 const APP_BRANCH_DEFAULT="main";
 const APP_NAME="pw-hack-demo-app";
-const MAX_HASHES=25,RATE_LIMIT_MS=30000,HASHES_CACHE_TTL=5000,INDEX_KEY="__index__";
+const MAX_HASHES=25,RATE_LIMIT_MS=500,HASHES_CACHE_TTL=5000,INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 function json(d,s=200){return new Response(JSON.stringify(d),{status:s,headers:{"Content-Type":"application/json",...CORS}});}
 function esc(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").slice(0,40);}
