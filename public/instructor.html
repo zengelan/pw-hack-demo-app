@@ -222,10 +222,11 @@
     const uiCommit  = ui?.commit  ?? '?';
     const uiBuilt   = ui?.builtAt ? new Date(ui.builtAt).toLocaleString() : '?';
     const beVersion = backend?.version ?? 'unavailable';
-    const beBranch  = backend?.branch  ?? '';
+    const beBranch  = backend?.branch  ?? '?';
+    const beCommit  = backend?.commit  ?? '?';
     el.innerHTML =
             `🖥 UI: <strong>${uiBranch}</strong> @ <code>${uiCommit}</code> (${uiBuilt})` +
-            `&nbsp;&nbsp;⚙️ Backend: <strong>${beVersion}</strong>${beBranch ? ' / ' + beBranch : ''}`;
+            `&nbsp;&nbsp;⚙️ Backend: <strong>${beVersion}</strong> / ${beBranch} @ <code>${beCommit}</code>`;
   });
 </script>
 

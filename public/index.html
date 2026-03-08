@@ -650,7 +650,7 @@
             .then(function(r){ return r.json(); })
             .then(function(d){
               var el = document.getElementById('version-footer');
-              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: ' + (d.version || '?') + (d.branch ? ' (' + d.branch + ')' : '');
+              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: ' + (d.version || '?') + ' / ' + (d.branch || '?') + ' @ ' + (d.commit || '?');
             })
             .catch(function(){
               var el = document.getElementById('version-footer');

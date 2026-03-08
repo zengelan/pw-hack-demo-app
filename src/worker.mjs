@@ -204,8 +204,9 @@ function passwordTypes() {
 function version(env) {
   const v = env?.APP_VERSION ?? "dev";
   const b = env?.APP_BRANCH ?? APP_BRANCH_DEFAULT;
+  const c = env?.APP_COMMIT ?? "unknown";
   const n = APP_NAME;
-  return json({version: v, branch: b, name: n});
+  return json({version: v, branch: b, commit: c, name: n});
 }
 
 // --- Core API ---
