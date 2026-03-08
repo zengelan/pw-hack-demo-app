@@ -2,13 +2,13 @@ name                = "pw-hack-demo-app"
 main                = "src/worker.mjs"
 compatibility_date  = "2026-03-06"
 workers_dev         = true
-routes          = [{ pattern = "pw-hack-demo.apps.zengel.cloud/*", zone_name = "apps.zengel.cloud" }]
+routes          = [{ pattern = "pw-hack-demo.apps.zengel.cloud/*", zone_name = "zengel.cloud" }]
 
 [assets]
 directory = "./public"
 
 [[kv_namespaces]]
-binding = "PWDEMOAPPHASHES"
+binding = "PWDEMOAPPHASES"
 id      = "31d012e28d2245aa8ca5d8a393bad836"
 
 [[kv_namespaces]]
