@@ -4,6 +4,9 @@ compatibility_date  = "2026-03-06"
 workers_dev         = true
 routes          = [{ pattern = "pw-hack-demo.apps.zengel.cloud/*", zone_name = "zengel.cloud" }]
 
+[vars]
+APP_VERSION = "v0.0.1"
+
 [assets]
 directory = "./public"
 
