@@ -2,13 +2,19 @@
 
 const DEFAULT_POLL_INTERVAL = 0; // Off by default
 let pollTimer = null;
-let isCracking = false;
-let crackTimer = null;
-let currentCrackIndex = 0;
+let crackingState = {
+  active: false,
+  currentId: null,
+  batchMode: false,
+  batchIndex: 0
+};
 let submissions = [];
 
 // --- Init ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize password spaces
+  await PasswordSpaces.init();
+  
   loadSubmissions();
   
   // Wire up poll interval dropdown
@@ -18,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = parseInt(pollSelect.value, 10);
       startPolling(isNaN(val) ? 0 : val);
     });
-    // Start with default (Off)
     startPolling(DEFAULT_POLL_INTERVAL);
   }
   
@@ -115,6 +120,7 @@ function showMeta(sub) {
     id:        sub.id,
     hash:      sub.hash,
     spaceId:   sub.spaceId,
+    passwordTypeId: sub.passwordTypeId || null,
     submitted: sub.submitted ? new Date(sub.submitted).toISOString() : null,
     cracked:   sub.cracked,
     password:  sub.password || null,
@@ -173,7 +179,7 @@ function renderTable(subs) {
     if (!sub) return;
     const action = btn.getAttribute('data-action');
     if (action === 'delete') deleteSingle(id);
-    if (action === 'crack')  crackSingle(id, sub.hash);
+    if (action === 'crack')  crackSingle(sub);
     if (action === 'info')   showMeta(sub);
   };
 }
@@ -191,104 +197,121 @@ async function deleteAll() {
   loadSubmissions();
 }
 
-// --- Crack single entry ---
-function crackSingle(id, hash) {
-  const cell = document.getElementById('crack-' + id);
+// --- Crack single entry (enhanced with type awareness) ---
+async function crackSingle(submission) {
+  if (crackingState.active) {
+    alert('A cracking operation is already in progress. Please wait or stop it first.');
+    return;
+  }
+  
+  const cell = document.getElementById('crack-' + submission.id);
   if (!cell) return;
-  cell.textContent = 'Cracking\u2026';
-  cell.style.color = '#888';
-  bruteForce(hash, (pwd, attempts, ms) => {
-    if (pwd) {
-      cell.innerHTML = '\u2705 <strong>' + pwd + '</strong>' +
+  
+  crackingState.active = true;
+  crackingState.currentId = submission.id;
+  
+  cell.innerHTML = '<span style="color:#ff0">Preparing\u2026</span>';
+  
+  // Determine password type
+  let passwordType;
+  if (submission.passwordTypeId) {
+    passwordType = PasswordSpaces.getMetadata(submission.passwordTypeId);
+  }
+  
+  if (!passwordType) {
+    // Fallback: try birthday type
+    passwordType = PasswordSpaces.getMetadata('birthday_ddmmyyyy');
+  }
+  
+  if (!passwordType) {
+    cell.innerHTML = '<span style="color:#f66">Error: No password type found</span>';
+    crackingState.active = false;
+    return;
+  }
+  
+  const typeLabel = PasswordSpaces.getLabel(passwordType.id);
+  cell.innerHTML = `<span style="color:#888">Cracking ${typeLabel}\u2026</span>`;
+  
+  // Load dictionary if needed
+  let dictionary = [];
+  if (passwordType.bruteForceStrategy.dictionarySupport) {
+    cell.innerHTML = `<span style="color:#888">Loading dictionary\u2026</span>`;
+    dictionary = await dictionaryLoader.loadForType(passwordType);
+  }
+  
+  // Determine truncation
+  const options = {
+    dictionary
+  };
+  
+  // For lowercase8, use first_1M mode by default
+  if (passwordType.id === 'lowercase8') {
+    options.truncationMode = 'first_1M';
+    const mode = passwordType.bruteForceStrategy.truncationModes.find(m => m.name === 'first_1M');
+    options.limit = mode.limit;
+  }
+  
+  // Progress callback
+  options.onProgress = (progress) => {
+    const speed = progress.speed ? progress.speed.toLocaleString() + ' H/s' : '';
+    cell.innerHTML = 
+      `<span style="color:#888">${progress.phase === 'dictionary' ? 'Dict' : 'Brute'}: ${progress.current}</span><br>` +
+      `<span style="font-size:0.7em;color:#666">${progress.attempts.toLocaleString()} attempts ${speed}</span>`;
+  };
+  
+  try {
+    const result = await workerPool.crack(submission.hash, passwordType, options);
+    
+    if (result.password) {
+      cell.innerHTML = '\u2705 <strong>' + result.password + '</strong>' +
         '<br><span style="font-size:0.75em;color:#888;font-weight:normal">' +
-        attempts.toLocaleString() + ' attempts, ' + ms + 'ms</span>';
+        result.attempts.toLocaleString() + ' attempts, ' + result.duration + 'ms (' + result.method + ')</span>';
       cell.style.color = '#4cff80';
       playSound('win');
-      fetch('/api/hash/' + id, {
+      
+      await fetch('/api/hash/' + submission.id, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({password: pwd, attempts})
+        body: JSON.stringify({password: result.password, attempts: result.attempts})
       });
     } else {
-      cell.textContent = 'Not found';
-      cell.style.color = '#f66';
+      cell.innerHTML = '<span style="color:#f66">Not found (' + result.attempts.toLocaleString() + ' attempts)</span>';
       playSound('fail');
     }
-  });
+  } catch (err) {
+    console.error('Crack error:', err);
+    cell.innerHTML = '<span style="color:#f66">Error: ' + err.message + '</span>';
+  } finally {
+    crackingState.active = false;
+    crackingState.currentId = null;
+  }
 }
 
 // --- Crack all sequentially ---
-function crackAll() {
-  if (isCracking) return;
-  isCracking = true;
-  currentCrackIndex = 0;
-  crackNext();
-}
-
-function crackNext() {
-  if (currentCrackIndex >= submissions.length) {
-    isCracking = false;
+async function crackAll() {
+  if (crackingState.active) {
+    alert('Already cracking. Please wait or stop first.');
     return;
   }
-  const s = submissions[currentCrackIndex];
-  currentCrackIndex++;
-  const cell = document.getElementById('crack-' + s.id);
-  if (!cell) { crackNext(); return; }
-  cell.textContent = 'Cracking\u2026';
-  cell.style.color = '#888';
-  bruteForce(s.hash, (pwd, attempts, ms) => {
-    if (pwd) {
-      cell.innerHTML = '\u2705 <strong>' + pwd + '</strong>' +
-        '<br><span style="font-size:0.75em;color:#888;font-weight:normal">' +
-        attempts.toLocaleString() + ' attempts, ' + ms + 'ms</span>';
-      cell.style.color = '#4cff80';
-      fetch('/api/hash/' + s.id, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({password: pwd, attempts})
-      });
-    } else {
-      cell.textContent = 'Not found';
-      cell.style.color = '#f66';
-    }
-    setTimeout(crackNext, 200);
-  });
-}
-
-// --- Brute force engine (DDMMYYYY birthday passwords) ---
-async function bruteForce(targetHash, callback) {
-  const start = Date.now();
-  let attempts = 0;
-  for (let year = 2020; year >= 1940; year--) {
-    for (let month = 1; month <= 12; month++) {
-      for (let day = 1; day <= 31; day++) {
-        const candidate = String(day).padStart(2,'0') + String(month).padStart(2,'0') + String(year);
-        attempts++;
-        const hash = await sha256(candidate);
-        if (hash === targetHash) {
-          callback(candidate, attempts, Date.now() - start);
-          return;
-        }
-        if (attempts % 1000 === 0) {
-          updateProgress(candidate, attempts);
-          await sleep(0);
-        }
-      }
-    }
+  
+  crackingState.active = true;
+  crackingState.batchMode = true;
+  crackingState.batchIndex = 0;
+  
+  for (let i = 0; i < submissions.length; i++) {
+    if (!crackingState.active) break;
+    
+    const sub = submissions[i];
+    if (sub.cracked) continue;
+    
+    crackingState.batchIndex = i;
+    await crackSingle(sub);
+    
+    await sleep(300);
   }
-  callback(null, attempts, Date.now() - start);
-}
-
-function updateProgress(current, attempts) {
-  const el = document.getElementById('crack-progress');
-  if (el) el.textContent = 'Trying: ' + current + ' | Attempts: ' + attempts.toLocaleString();
-}
-
-async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  crackingState.active = false;
+  crackingState.batchMode = false;
 }
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -303,7 +326,7 @@ async function loadSpacesAdmin() {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Error loading spaces (API returned ' + res.status + ')</td></tr>';
       return;
     }
-    const spaces = await res.json(); // Backend returns direct array
+    const spaces = await res.json();
     if (!Array.isArray(spaces)) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Invalid response format from spaces API</td></tr>';
       return;
