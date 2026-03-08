@@ -1,4 +1,5 @@
 const APP_VERSION="v0.0.1";
+const APP_BRANCH_DEFAULT="main";
 const APP_NAME="pw-hack-demo-app";
 const MAX_HASHES=25,RATE_LIMIT_MS=30000,HASHES_CACHE_TTL=5000,INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
@@ -94,8 +95,11 @@ async function deleteSpace(env,id){
 }
 
 // --- Version ---
-function version(){
-  return json({version:APP_VERSION,name:APP_NAME});
+function version(env){
+    const v=env?.APP_VERSION||APP_VERSION;
+    const b=env?.APP_BRANCH||APP_BRANCH_DEFAULT;
+    const n=APP_NAME;
+    return json({version:v,branch:b,name:n});
 }
 
 // --- Core API ---
@@ -159,9 +163,9 @@ async function updateAllowlist(req,env){
 export default{
   async fetch(req,env){
     const url=new URL(req.url),p=url.pathname;
-    console.log(`[${APP_NAME}@${APP_VERSION}] ${req.method} ${p}`);
+            console.log(`[${APP_NAME}@${env?.APP_VERSION||APP_VERSION}/${env?.APP_BRANCH||APP_BRANCH_DEFAULT}] ${req.method} ${p}`);
     if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
-    if(p==="/api/version"&&req.method==="GET")return version();
+            if(p==="/api/version"&&req.method==="GET")return version(env);
     if(p==="/api/myip"&&req.method==="GET")return myIp(req);
     if(p==="/api/hashes"&&req.method==="GET")return hashes(env);
     if(p==="/api/submit"&&req.method==="POST")return submit(req,env);
