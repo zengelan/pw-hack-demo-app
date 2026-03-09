@@ -22,6 +22,23 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
+// API Base URL detection
+// Cloudflare Pages preview URLs (*.pages.dev) only serve static files
+// API routes are only available on production domain
+function getApiBaseUrl() {
+  const hostname = window.location.hostname;
+  
+  // If on a Cloudflare Pages preview URL, use production for API
+  if (hostname.includes('.pages.dev')) {
+    return 'https://pw-hack-demo.apps.zengel.cloud';
+  }
+  
+  // Otherwise use relative paths (same origin)
+  return '';
+}
+
+const API_BASE = getApiBaseUrl();
+
 // Generate type badges dynamically from PasswordSpaces
 function getTypeBadge(passwordTypeId) {
   const type = PasswordSpaces.getMetadata(passwordTypeId);
@@ -57,6 +74,9 @@ function getDictionaryInfo(passwordTypeId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Log API routing info
+  console.log('API Base URL:', API_BASE || '(relative paths)');
+  
   await PasswordSpaces.init();
   await loadDictionary();
   await loadSpaces();
@@ -134,7 +154,7 @@ function startPolling(intervalMs) {
 
 async function loadSpaces() {
   try {
-    const res = await fetch('/api/spaces');
+    const res = await fetch(API_BASE + '/api/spaces');
     if (!res.ok) {
       console.error('Failed to load spaces');
       return;
@@ -277,7 +297,7 @@ function getWorkerCount() {
 
 async function loadSubmissions() {
   try {
-    const res = await fetch('/api/hashes');
+    const res = await fetch(API_BASE + '/api/hashes');
     if (!res.ok) return;
     const data = await res.json();
     submissions = Array.isArray(data) ? data : [];
@@ -495,7 +515,7 @@ function formatTime(ms) {
 
 async function saveCrackedPassword(id, password, attempts) {
   try {
-    const res = await fetch(`/api/hash/${id}`, {
+    const res = await fetch(API_BASE + `/api/hash/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -520,6 +540,8 @@ async function saveCrackedPassword(id, password, attempts) {
         crackedCell.innerHTML = '✅ <strong>' + password + '</strong>';
         crackedCell.style.color = '#4cff80';
       }
+    } else {
+      console.error('Failed to save cracked password:', res.status, await res.text());
     }
   } catch (err) {
     console.error('Failed to save cracked password:', err);
@@ -737,13 +759,13 @@ function syntaxHighlightJson(obj) {
 }
 
 async function deleteSingle(id) {
-  await fetch('/api/hash/' + id, { method: 'DELETE' });
+  await fetch(API_BASE + '/api/hash/' + id, { method: 'DELETE' });
   loadSubmissions();
 }
 
 async function deleteAll() {
   if (!confirm('Delete ALL submissions?')) return;
-  await fetch('/api/clear', { method: 'POST' });
+  await fetch(API_BASE + '/api/clear', { method: 'POST' });
   loadSubmissions();
 }
 
@@ -785,7 +807,7 @@ async function loadSpacesAdmin() {
   const tbody = document.getElementById('spaces-tbody');
   if (!tbody) return;
   try {
-    const res = await fetch('/api/spaces');
+    const res = await fetch(API_BASE + '/api/spaces');
     if (!res.ok) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Error loading spaces (API returned ' + res.status + ')</td></tr>';
       return;
@@ -816,7 +838,7 @@ async function loadSpacesAdmin() {
       const id = btn.getAttribute('data-spaceid');
       if (!id) return;
       if (!confirm('Delete space "' + id + '"?')) return;
-      await fetch('/api/spaces/' + id, { method: 'DELETE' });
+      await fetch(API_BASE + '/api/spaces/' + id, { method: 'DELETE' });
       loadSpacesAdmin();
     };
   } catch (e) {
@@ -836,7 +858,7 @@ async function saveSpaceFromForm() {
     return;
   }
   try {
-    const res = await fetch('/api/spaces', {
+    const res = await fetch(API_BASE + '/api/spaces', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({id, name, location, description})
