@@ -22,6 +22,7 @@ class WorkerPool {
       worker.workerId = i;
       this.workers.push(worker);
     }
+    console.log(`Worker pool: ${this.workers.length} workers created`);
   }
   
   /**
@@ -251,3 +252,8 @@ class WorkerPool {
 
 // Singleton instance
 const workerPool = new WorkerPool();
+
+// Export for different environments
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { WorkerPool, workerPool };
+}

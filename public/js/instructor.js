@@ -26,6 +26,7 @@ const TYPE_BADGES = {
   'birthday_ddmmyyyy': { label: 'Birthday', class: 'type-birthday' },
   'digits8': { label: 'Digits8', class: 'type-digits8' },
   'lowercase8': { label: 'Lower8', class: 'type-lowercase8' },
+  'alphanumeric8': { label: 'AlphaNum8', class: 'type-alphanumeric8' },
   'pin4': { label: 'PIN4', class: 'type-pin4' },
   'digits6': { label: 'Digits6', class: 'type-digits6' }
 };
@@ -79,15 +80,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadDictionary() {
-  if (typeof DictionaryLoader !== 'undefined') {
+  if (typeof dictionaryLoader !== 'undefined') {
     try {
-      crackingState.dictionary = await DictionaryLoader.load();
-      console.log('Dictionary loaded:', crackingState.dictionary.length, 'words');
+      crackingState.dictionary = await dictionaryLoader.load('/dictionaries/common-passwords.txt');
+      console.log('Dictionary loaded:', crackingState.dictionary ? crackingState.dictionary.length : 0, 'words');
     } catch (e) {
       console.error('Failed to load dictionary:', e);
       crackingState.dictionary = [];
     }
   } else {
+    console.warn('dictionaryLoader not available');
     crackingState.dictionary = [];
   }
 }
@@ -180,6 +182,7 @@ function populateTypeFilters() {
     { id: 'birthday_ddmmyyyy', defaultChecked: true },
     { id: 'digits8', defaultChecked: false },
     { id: 'lowercase8', defaultChecked: false },
+    { id: 'alphanumeric8', defaultChecked: false },
     { id: 'pin4', defaultChecked: true },
     { id: 'digits6', defaultChecked: false }
   ];
@@ -317,6 +320,12 @@ async function startCracking() {
     return;
   }
   
+  if (typeof workerPool === 'undefined') {
+    updateStatus('ERROR', 'Worker pool not initialized');
+    console.error('workerPool is not defined');
+    return;
+  }
+  
   crackingState.active = true;
   crackingState.paused = false;
   crackingState.batch = uncracked;
@@ -333,9 +342,7 @@ async function startCracking() {
   const numWorkers = getWorkerCount();
   console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
   
-  if (workerPool) {
-    workerPool.maxWorkers = numWorkers;
-  }
+  workerPool.maxWorkers = numWorkers;
   
   await processBatch();
 }
@@ -369,9 +376,11 @@ async function processBatch() {
       const result = await workerPool.crack(submission.hash, passwordType, options);
       
       if (result.password) {
-        console.log(`Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
+        console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
         await saveCrackedPassword(submission.id, result.password, result.attempts);
         crackingState.crackedCount++;
+      } else {
+        console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
       }
       
       crackingState.totalAttempts += result.attempts;
