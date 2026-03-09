@@ -11,7 +11,8 @@ let crackingState = {
   batchIndex: 0,
   startTime: null,
   totalAttempts: 0,
-  totalTime: 0
+  totalTime: 0,
+  dictionaryStats: null  // Store dictionary loading stats
 };
 let submissions = [];
 let progressInterval = null;
@@ -185,6 +186,23 @@ function formatCrackDuration(sub) {
 function getTypeBadgeHTML(typeId) {
   const badge = TYPE_BADGES[typeId] || { label: 'Unknown', class: 'type-unknown' };
   return `<span class="type-badge ${badge.class}">${badge.label}</span>`;
+}
+
+// --- Get filename from URL ---
+function getFilenameFromUrl(url) {
+  try {
+    const parts = url.split('/');
+    return parts[parts.length - 1];
+  } catch {
+    return 'dictionary';
+  }
+}
+
+// --- Format large numbers ---
+function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
 }
 
 // --- JSON syntax highlighter ---
@@ -480,6 +498,7 @@ async function crackSingle(submission, options = {}) {
   
   crackingState.currentId = submission.id;
   crackingState.currentHash = submission.hash;
+  crackingState.dictionaryStats = null;
   
   // Highlight row
   document.querySelectorAll('tr.row-cracking').forEach(tr => tr.classList.remove('row-cracking'));
@@ -507,11 +526,56 @@ async function crackSingle(submission, options = {}) {
   const badge = TYPE_BADGES[passwordType.id] || { label: 'Unknown' };
   cell.innerHTML = `<span style="color:#888">Cracking ${badge.label}…</span>`;
   
-  // Load dictionary if needed
+  // Load dictionary if needed - ONLY if password type supports dictionaries
   let dictionary = [];
-  if (options.useDictionary !== false && passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.dictionarySupport) {
-    cell.innerHTML = `<span style="color:#888">Loading dictionary…</span>`;
-    dictionary = await dictionaryLoader.loadForType(passwordType);
+  const hasDictSupport = passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.dictionarySupport;
+  
+  if (options.useDictionary !== false && hasDictSupport) {
+    const dictStartTime = Date.now();
+    const strategy = passwordType.bruteForceStrategy;
+    
+    cell.innerHTML = `<span style="color:#888">Loading dictionaries…</span>`;
+    updateMetrics({
+      phase: 'Loading dictionaries for ' + badge.label + '…'
+    });
+    
+    // Load with detailed tracking
+    const filterRegex = strategy.dictionaryFilterRegex;
+    const dictUrls = strategy.dictionaryUrls || [];
+    const dictionaries = [];
+    
+    for (let i = 0; i < dictUrls.length; i++) {
+      const url = dictUrls[i];
+      const filename = getFilenameFromUrl(url);
+      
+      cell.innerHTML = `<span style="color:#888">Loading ${filename}… (${i + 1}/${dictUrls.length})</span>`;
+      updateMetrics({
+        phase: `Loading dictionary ${i + 1}/${dictUrls.length}: ${filename}`
+      });
+      
+      const words = await dictionaryLoader.load(url, filterRegex);
+      dictionaries.push({ url, filename, count: words.length });
+      dictionary.push(...words);
+    }
+    
+    // Deduplicate
+    const uniqueDict = [...new Set(dictionary)];
+    const dictLoadTime = Date.now() - dictStartTime;
+    
+    crackingState.dictionaryStats = {
+      sources: dictionaries,
+      totalRaw: dictionary.length,
+      totalFiltered: uniqueDict.length,
+      loadTimeMs: dictLoadTime
+    };
+    
+    dictionary = uniqueDict;
+    
+    console.log(`Dictionary loaded: ${dictionary.length} unique entries from ${dictUrls.length} sources in ${dictLoadTime}ms`);
+    cell.innerHTML = `<span style="color:#888">Dictionary ready (${formatNumber(dictionary.length)} entries, ${dictLoadTime}ms)</span>`;
+  } else if (options.useDictionary !== false && !hasDictSupport) {
+    // User wants dictionary but type doesn't support it
+    console.log(`Password type ${passwordType.id} does not support dictionaries, skipping…`);
   }
   
   // Configure options
@@ -519,7 +583,6 @@ async function crackSingle(submission, options = {}) {
   
   // Apply truncation - with null checks
   if (options.truncationMode && options.truncationMode !== 'full') {
-    // Check if bruteForceStrategy and truncationModes exist
     if (passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.truncationModes) {
       const mode = passwordType.bruteForceStrategy.truncationModes.find(
         m => m.name === options.truncationMode
@@ -545,6 +608,14 @@ async function crackSingle(submission, options = {}) {
     const percentage = progress.total > 0 ? ((progress.attempts / progress.total) * 100) : 0;
     
     updateProgress({ percentage });
+    
+    // Enhanced phase display with dictionary stats
+    let phaseText = progress.phase === 'dictionary' ? 'Dictionary Attack' : 'Brute-force Search';
+    if (progress.phase === 'dictionary' && crackingState.dictionaryStats) {
+      const stats = crackingState.dictionaryStats;
+      phaseText += ` (${formatNumber(stats.totalFiltered)} entries, ${stats.loadTimeMs}ms load)`;
+    }
+    
     updateMetrics({
       hash: submission.hash.substring(0, 12) + '…',
       candidate: progress.current,
@@ -552,7 +623,7 @@ async function crackSingle(submission, options = {}) {
       attempts: `${progress.attempts.toLocaleString()} / ${progress.total.toLocaleString()}`,
       elapsed: formatTime(Date.now() - crackingState.startTime),
       estimated: progress.speed > 0 ? formatTime(((progress.total - progress.attempts) / progress.speed) * 1000) : '—',
-      phase: progress.phase === 'dictionary' ? 'Dictionary Attack' : 'Brute-force Search'
+      phase: phaseText
     });
     
     cell.innerHTML = 
@@ -589,6 +660,7 @@ async function crackSingle(submission, options = {}) {
     cell.innerHTML = '<span style="color:#f66">Error: ' + err.message + '</span>';
   } finally {
     crackingState.currentId = null;
+    crackingState.dictionaryStats = null;
     if (row) row.classList.remove('row-cracking');
     
     if (!crackingState.batchMode) {
