@@ -1,6 +1,6 @@
 // student.js - Student submission form logic
 
-const MAX_SUBMISSIONS = 25;
+const MAX_SUBMISSIONS = 50;
 
 let selectedPasswordType = null;
 let _passwordTypes = [];
@@ -354,7 +354,10 @@ async function loadSpaces() {
     _spaces.forEach(function(s) {
       var opt = document.createElement('option');
       opt.value = s.id;
-      opt.textContent = s.name;
+      // Show name, location, and description in dropdown for complete information
+      opt.textContent = s.name + 
+                        ' — ' + (s.location || 'Location TBA') + 
+                        (s.description ? ' — ' + s.description : '');
       sel.appendChild(opt);
     });
 
