@@ -141,8 +141,9 @@ function getFilteredSubmissions() {
 // --- Initialize Control Center ---
 function initControlCenter() {
   // Detect worker count
-  const workerCount = navigator.hardwareConcurrency || 4;
-  document.getElementById('worker-count').textContent = workerCount;
+  const totalCores = navigator.hardwareConcurrency || 4;
+  document.getElementById('worker-count').textContent = '1';
+  document.getElementById('worker-count').setAttribute('data-total', totalCores);
   
   // Populate type filters
   populateTypeFilters();
@@ -184,18 +185,31 @@ function populateTypeFilters() {
 function updateModeUI() {
   const mode = document.querySelector('input[name="crack-mode"]:checked').value;
   const isGPU = mode === 'gpu';
+  const isSingle = mode === 'single';
+  const isMulti = mode === 'multi';
   
   document.getElementById('btn-start-crack').style.display = isGPU ? 'none' : 'inline-block';
   document.getElementById('btn-download-gpu').style.display = isGPU ? 'inline-block' : 'none';
   
   // Update info text
   const infoEl = document.getElementById('mode-info');
+  const totalCores = document.getElementById('worker-count').getAttribute('data-total') || navigator.hardwareConcurrency || 4;
+  
   if (isGPU) {
     infoEl.innerHTML = 'Export: <span>Python script</span>';
-  } else {
-    const workerCount = navigator.hardwareConcurrency || 4;
-    infoEl.innerHTML = `Workers: <span>${workerCount} cores</span>`;
+  } else if (isSingle) {
+    infoEl.innerHTML = 'Workers: <span id="worker-count">1</span> thread';
+  } else if (isMulti) {
+    infoEl.innerHTML = `Workers: <span id="worker-count">${totalCores}</span> threads`;
   }
+}
+
+// --- Get worker count based on mode ---
+function getWorkerCount() {
+  const mode = document.querySelector('input[name="crack-mode"]:checked').value;
+  if (mode === 'single') return 1;
+  if (mode === 'multi') return navigator.hardwareConcurrency || 4;
+  return 1; // Default
 }
 
 // --- Polling control ---
@@ -501,6 +515,12 @@ async function startCracking() {
     alert('No hashes to crack with selected filters in current space.');
     return;
   }
+  
+  // Reinitialize worker pool with correct worker count
+  const workerCount = getWorkerCount();
+  workerPool.maxWorkers = workerCount;
+  workerPool.init();
+  console.log(`Worker pool reinitialized with ${workerCount} worker(s)`);
   
   // Start cracking
   crackingState.active = true;
