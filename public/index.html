@@ -323,16 +323,16 @@
     </p>
 
     <div class="hash-explainer" style="margin-top:0; margin-bottom:20px;">
-      <h3 style="color:#dd8; margin-top:0; display:flex; align-items:center; gap:8px;">
+      <h3 data-i18n="pwTypeWhyMatters" style="color:#dd8; margin-top:0; display:flex; align-items:center; gap:8px;">
         &#x1F4CA; Why Does Password Type Matter?
       </h3>
-      <p>
+      <p data-i18n="pwTypeWhyMattersText">
         Two passwords can produce completely different-looking SHA-256 hashes, yet one can be cracked in
         <strong style="color:#f88;">milliseconds</strong> and the other would take
         <strong style="color:#8f8;">millions of years</strong>.
         The difference is not the hash algorithm &mdash; it is the <em>size of the search space</em>.
       </p>
-      <div class="cow-story" style="font-style:normal;">
+      <div class="cow-story" data-i18n="pwTypeCrackerWorks" style="font-style:normal;">
         &#x1F50D; <strong>How the cracker works:</strong><br>
         For a <em>birthday</em> there are only ~36,500 plausible dates. The cracker hashes every single one
         in under 40&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password
@@ -476,27 +476,19 @@
         </thead>
         <tbody>
         <tr class="danger-extreme">
-          <td data-i18n="pwType4Pin">4-digit PIN</td>
-          <td data-i18n="charSetDigits">Digits 0–9</td>
-          <td>10<sup>4</sup></td>
-          <td>10,000<br><span class="digit-count">(5 digits)</span></td>
-          <td data-i18n="time10ms">~10 ms</td>
-          <td data-i18n="timeInstant">Instant</td>
-        </tr>
-        <tr class="danger-extreme">
           <td data-i18n="pwTypeBirthday">8-digit birthday (DDMMYYYY)</td>
           <td data-i18n="charSetDates">Valid calendar dates</td>
-          <td>~36,525 dates</td>
+          <td>365.25 × 100</td>
           <td>36,525<br><span class="digit-count">(5 digits)</span></td>
           <td data-i18n="time36ms">~36 ms</td>
           <td data-i18n="timeInstant">Instant</td>
         </tr>
         <tr class="danger-high">
-          <td data-i18n="pwType6Digit">6-digit number</td>
+          <td data-i18n="pwType8Digit">8-digit PIN (00000000–99999999)</td>
           <td data-i18n="charSetDigits">Digits 0–9</td>
-          <td>10<sup>6</sup></td>
-          <td>~1.00 × 10<sup>6</sup><br><span class="digit-count">(7 digits)</span></td>
-          <td data-i18n="time1sec">~1 second</td>
+          <td>10<sup>8</sup></td>
+          <td>~1.00 × 10<sup>8</sup><br><span class="digit-count">(9 digits)</span></td>
+          <td data-i18n="time167min">~1.7 minutes</td>
           <td data-i18n="timeInstant">Instant</td>
         </tr>
         <tr class="danger-medium">
@@ -514,30 +506,6 @@
           <td>~2.18 × 10<sup>14</sup><br><span class="digit-count">(15 digits)</span></td>
           <td data-i18n="time69years">~6.9 years</td>
           <td data-i18n="time28hours">~2.8 hours</td>
-        </tr>
-        <tr class="warning">
-          <td data-i18n="pwType8Special">8-char + special chars</td>
-          <td data-i18n="charSetAscii">94 printable ASCII</td>
-          <td>94<sup>8</sup></td>
-          <td>~6.10 × 10<sup>15</sup><br><span class="digit-count">(16 digits)</span></td>
-          <td data-i18n="time193years">~193 years</td>
-          <td data-i18n="time32days">~3.2 days</td>
-        </tr>
-        <tr class="safe">
-          <td data-i18n="pwType12Alnum">12-char alphanumeric</td>
-          <td data-i18n="charSetAlnum">a–z, A–Z, 0–9 (62)</td>
-          <td>62<sup>12</sup></td>
-          <td>~3.23 × 10<sup>21</sup><br><span class="digit-count">(22 digits)</span></td>
-          <td data-i18n="time102myears">~102 million years</td>
-          <td data-i18n="time4647years">~4,647 years</td>
-        </tr>
-        <tr class="safe">
-          <td data-i18n="pwType12Special">12-char + special chars</td>
-          <td data-i18n="charSetAscii">94 printable ASCII</td>
-          <td>94<sup>12</sup></td>
-          <td>~4.76 × 10<sup>23</sup><br><span class="digit-count">(24 digits)</span></td>
-          <td data-i18n="time151byears">~15.1 billion years</td>
-          <td data-i18n="time685kyears">~685,500 years</td>
         </tr>
         </tbody>
       </table>
@@ -657,21 +625,25 @@
 
 <!-- Version Footer -->
 <footer style="text-align:center;padding:12px 0 8px;margin-top:32px;border-top:1px solid #222;">
-  <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: {{UI_VERSION}} &nbsp;|&nbsp; backend: …</span>
+  <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: v0.0.1 &nbsp;|&nbsp; backend: …</span>
 </footer>
 <script>
-  (function() {
-    fetch('/api/version')
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-              var el = document.getElementById('version-footer');
-              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: ' + (d.version || '?') + ' / ' + (d.branch || '?') + ' @ ' + (d.commit || '?');
-            })
-            .catch(function(){
-              var el = document.getElementById('version-footer');
-              if(el) el.textContent = 'ui: {{UI_VERSION}} ({{UI_BRANCH}}) | backend: unavailable';
-            });
-  })();
+  Promise.all([
+    fetch('/build-info.json', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    fetch('/api/version').then(r => r.json()).catch(() => null)
+  ]).then(([ui, backend]) => {
+    const el = document.getElementById('version-footer');
+    if (!el) return;
+    const uiBranch  = ui?.branch  ?? '?';
+    const uiCommit  = ui?.commit  ?? '?';
+    const uiBuilt   = ui?.builtAt ? new Date(ui.builtAt).toLocaleString() : '?';
+    const beVersion = backend?.version ?? 'unavailable';
+    const beBranch  = backend?.branch  ?? '?';
+    const beCommit  = backend?.commit  ?? '?';
+    el.innerHTML =
+            `🖥 UI: <strong>${uiBranch}</strong> @ <code>${uiCommit}</code> (${uiBuilt})` +
+            `&nbsp;&nbsp;⚙️ Backend: <strong>${beVersion}</strong> / ${beBranch} @ <code>${beCommit}</code>`;
+  });
 </script>
 
 </body>
