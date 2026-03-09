@@ -9,7 +9,7 @@ const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GE
 // ---------------------------------------------------------------------------
 const PASSWORD_TYPES = [
   {
-    id: "birthday_ddmmyyyy",
+    id: "birthday",
     label: "Birthday (DDMMYYYY)",
     description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1927–2026 (last 100 years).",
     format: "DDMMYYYY",
@@ -91,7 +91,6 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
       ],
       dictionaryFilterRegex: "^[0-9]{8}$",
@@ -148,10 +147,9 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt",
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt",
         "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt",
-        "https://github.com/first20hours/google-10000-english/raw/master/google-10000-english-no-swears.txt"
+        "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt"
       ],
       dictionaryFilterRegex: "^[a-z]{8}$",
       dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick real words (password, sunshine, etc.)",
@@ -209,8 +207,7 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt"
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
       ],
       dictionaryFilterRegex: "^[a-zA-Z0-9]{8}$",
       dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick predictable patterns (Admin123, Password1, etc.)",
@@ -511,7 +508,7 @@ async function submit(req, env) {
     spaceId: body.spaceId,
     passwordTypeId: passwordTypeId,
     submitted: Date.now(),
-    cracked: false, attempts: 0, password: null, crackedAt: null,
+    cracked: false, attempts: 0, password: null, crackedAt: null, crackDurationMs: null,
     meta: {
       ip, country: cf.country ?? "unknown", city: cf.city ?? "unknown",
       region: cf.region ?? "unknown", postalCode: cf.postalCode ?? "unknown",
@@ -537,17 +534,44 @@ async function hashes() {
   const now = Date.now();
   if (_hc && (now - _ht) < HASHES_CACHE_TTL) return json(_hc);
   const idx = await getIndex();
-  const rows = await Promise.all(idx.map(id => KV_HASHES.getWithMetadata(id)));
-  _hc = rows.map(r => r.value ? JSON.parse(r.value) : null).filter(Boolean);
+  const rows = await Promise.all(idx.map(id => KV_HASHES.get(id)));
+  _hc = rows.map(r => r ? JSON.parse(r) : null).filter(Boolean);
   _ht = now;
   return json(_hc);
 }
 
+// New lightweight endpoint for instructor cracking workflow
+async function crackHash(req, id) {
+  _hc = null; _ht = 0;
+  
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
+  
+  const raw = await KV_HASHES.get(id);
+  if (!raw) return json({error: "Hash not found."}, 404);
+  
+  const entry = JSON.parse(raw);
+  const body = await req.json().catch(() => ({}));
+  
+  // Merge cracked data - crackDurationMs is actual brute-force time
+  const updated = {
+    ...entry,
+    cracked: true,
+    password: esc(body.password ?? ""),
+    attempts: body.attempts ?? 0,
+    crackedAt: body.crackedAt ?? Date.now(),
+    crackDurationMs: body.crackDurationMs ?? 0
+  };
+  
+  await KV_HASHES.put(id, JSON.stringify(updated), {expirationTtl:7200});
+  return json({success: true});
+}
+
+// Legacy endpoint - kept for backward compatibility but not used
 async function updateHash(req, id) {
   _hc = null; _ht = 0;
-  const e = await KV_HASHES.getWithMetadata(id);
-  if (!e || !e.metadata) return json({error: "Not found."}, 404);
-  const entry = JSON.parse(e.value);
+  const raw = await KV_HASHES.get(id);
+  if (!raw) return json({error: "Not found."}, 404);
+  const entry = JSON.parse(raw);
   const b = await req.json().catch(() => ({}));
   const updated = {...entry, cracked: true, password: esc(b.password ?? ""), attempts: b.attempts ?? 0, crackedAt: Date.now()};
   if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
@@ -605,6 +629,11 @@ export default {
     const mSpace = p.match(/^\/api\/spaces\/([^/]+)$/);
     if (mSpace && req.method === "DELETE") return deleteSpace(mSpace[1]);
 
+    // New dedicated instructor endpoint for cracking
+    const mCrack = p.match(/^\/api\/crack\/([0-9a-f-]{36})$/i);
+    if (mCrack && req.method === "POST") return crackHash(req, mCrack[1]);
+
+    // Legacy endpoints (keep for backward compatibility)
     const m = p.match(/^\/api\/hash\/([0-9a-f-]{36})$/i);
     if (m) {
       if (req.method === "POST")   return updateHash(req, m[1]);

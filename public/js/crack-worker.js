@@ -6,6 +6,7 @@
 importScripts('/js/password-spaces.js');
 
 let cancelled = false;
+let debugLogCount = 0;
 
 // Message handler
 self.onmessage = async function(e) {
@@ -17,6 +18,7 @@ self.onmessage = async function(e) {
   }
   
   cancelled = false;
+  debugLogCount = 0;
   
   if (action === 'dictionary') {
     await dictionaryAttack(e.data);
@@ -32,6 +34,8 @@ async function dictionaryAttack({ targetHash, dictionary }) {
   let attempts = 0;
   const startTime = Date.now();
   
+  console.log(`[Worker] Dictionary attack started: ${dictionary.length} words, target: ${targetHash.substring(0,16)}...`);
+  
   for (const word of dictionary) {
     if (cancelled) {
       self.postMessage({ type: 'cancelled', data: { attempts } });
@@ -41,7 +45,14 @@ async function dictionaryAttack({ targetHash, dictionary }) {
     attempts++;
     const hash = await sha256(word);
     
+    // Debug first few attempts
+    if (debugLogCount < 3) {
+      console.log(`[Worker] Dict attempt ${attempts}: "${word}" -> ${hash.substring(0,16)}...`);
+      debugLogCount++;
+    }
+    
     if (hash === targetHash) {
+      console.log(`[Worker] ✅ FOUND via dictionary! "${word}" at attempt ${attempts}`);
       self.postMessage({
         type: 'found',
         data: { password: word, attempts }
@@ -60,6 +71,7 @@ async function dictionaryAttack({ targetHash, dictionary }) {
     }
   }
   
+  console.log(`[Worker] Dictionary exhausted after ${attempts} attempts`);
   self.postMessage({
     type: 'exhausted',
     data: { attempts }
@@ -74,6 +86,8 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
   if (!PasswordSpaces.types.length) {
     await PasswordSpaces.init();
   }
+  
+  console.log(`[Worker] Brute-force started: type=${passwordType.id}, offset=${offset}, limit=${limit}, target=${targetHash.substring(0,16)}...`);
   
   const generator = PasswordSpaces.getGenerator(passwordType.id, { limit: offset + limit });
   
@@ -96,7 +110,19 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
     attempts++;
     const hash = await sha256(candidate);
     
+    // Debug first few attempts
+    if (debugLogCount < 3) {
+      console.log(`[Worker] BF attempt ${attempts}: "${candidate}" -> ${hash.substring(0,16)}...`);
+      if (debugLogCount === 0) {
+        console.log(`[Worker] Target hash: ${targetHash}`);
+        console.log(`[Worker] Generated hash: ${hash}`);
+        console.log(`[Worker] Match: ${hash === targetHash}`);
+      }
+      debugLogCount++;
+    }
+    
     if (hash === targetHash) {
+      console.log(`[Worker] ✅ FOUND via brute-force! "${candidate}" at attempt ${attempts}`);
       self.postMessage({
         type: 'found',
         data: { password: candidate, attempts }
@@ -117,6 +143,7 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
     if (attempts >= limit) break;
   }
   
+  console.log(`[Worker] Brute-force exhausted after ${attempts} attempts (limit: ${limit})`);
   self.postMessage({
     type: 'exhausted',
     data: { attempts }
@@ -124,7 +151,7 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
 }
 
 /**
- * SHA-256 hash function
+ * SHA-256 hash function (Web Crypto API)
  */
 async function sha256(message) {
   const msgBuffer = new TextEncoder().encode(message);

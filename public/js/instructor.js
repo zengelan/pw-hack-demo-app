@@ -1,6 +1,6 @@
 // instructor.js - Enhanced Instructor Dashboard with Control Center
 
-const DEFAULT_POLL_INTERVAL = 0; // Off by default
+const DEFAULT_POLL_INTERVAL = 0;
 let pollTimer = null;
 let crackingState = {
   active: false,
@@ -8,36 +8,64 @@ let crackingState = {
   currentId: null,
   currentHash: null,
   batchMode: false,
+  batch: [],
   batchIndex: 0,
   startTime: null,
   totalAttempts: 0,
   totalTime: 0,
-  dictionaryStats: null  // Store dictionary loading stats
+  crackedCount: 0
 };
-let submissions = [];  // All submissions
-let allSpaces = [];    // All available spaces
-let currentSpace = null;  // Currently selected space
+let submissions = [];
+let allSpaces = [];
+let currentSpace = null;
 let progressInterval = null;
-let totalCores = navigator.hardwareConcurrency || 4;  // Store cores globally
+let totalCores = navigator.hardwareConcurrency || 4;
 
-// Type badge mapping (no emojis)
-const TYPE_BADGES = {
-  'birthday_ddmmyyyy': { label: 'Birthday', class: 'type-birthday' },
-  'digits8': { label: 'Digits8', class: 'type-digits8' },
-  'lowercase8': { label: 'Lower8', class: 'type-lowercase8' }
-};
+// API Base URL detection
+// Cloudflare Pages preview URLs (*.pages.dev) only serve static files
+// API routes are only available on production domain
+function getApiBaseUrl() {
+  const hostname = window.location.hostname;
+  
+  // If on a Cloudflare Pages preview URL, use production for API
+  if (hostname.includes('.pages.dev')) {
+    return 'https://pw-hack-demo.apps.zengel.cloud';
+  }
+  
+  // Otherwise use relative paths (same origin)
+  return '';
+}
 
-// --- Init ---
+const API_BASE = getApiBaseUrl();
+
+// Get dictionary count for a password type
+function getDictionaryInfo(passwordTypeId) {
+  const type = PasswordSpaces.getMetadata(passwordTypeId);
+  if (!type || !type.bruteForceStrategy) return { count: 0, urls: [], tooltip: '' };
+  
+  const strategy = type.bruteForceStrategy;
+  const urls = strategy.dictionaryUrls || [];
+  const count = urls.length;
+  
+  if (count === 0 || !strategy.dictionarySupport) {
+    return { count: 0, urls: [], tooltip: 'No dictionary support' };
+  }
+  
+  // Build tooltip with dictionary list
+  const tooltip = `Uses ${count} ${count === 1 ? 'dictionary' : 'dictionaries'}:\n` + 
+                  urls.map(url => '• ' + url.split('/').pop()).join('\n');
+  
+  return { count, urls, tooltip };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize password spaces
+  // Log API routing info
+  console.log('API Base URL:', API_BASE || '(relative paths)');
+  
   await PasswordSpaces.init();
-  
-  // Load spaces first, then submissions
   await loadSpaces();
-  
   initControlCenter();
   
-  // Wire up space filter
   const spaceSelect = document.getElementById('space-filter-select');
   if (spaceSelect) {
     spaceSelect.addEventListener('change', () => {
@@ -47,7 +75,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   
-  // Wire up poll interval dropdown
   const pollSelect = document.getElementById('poll-interval-select');
   if (pollSelect) {
     pollSelect.addEventListener('change', () => {
@@ -57,21 +84,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     startPolling(DEFAULT_POLL_INTERVAL);
   }
   
-  // Wire up buttons
   document.getElementById('btn-delete-all').addEventListener('click', deleteAll);
   document.getElementById('btn-refresh').addEventListener('click', loadSubmissions);
   document.getElementById('btn-start-crack').addEventListener('click', startCracking);
-  document.getElementById('btn-pause-crack').addEventListener('click', pauseCracking);
+  document.getElementById('btn-pause-crack').addEventListener('click', togglePause);
   document.getElementById('btn-stop-crack').addEventListener('click', stopCracking);
   document.getElementById('btn-download-gpu').addEventListener('click', downloadGPUScript);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
   
-  // Mode switching
   document.querySelectorAll('input[name="crack-mode"]').forEach(radio => {
     radio.addEventListener('change', updateModeUI);
   });
   
-  // Select all types
   document.getElementById('select-all-types')?.addEventListener('change', (e) => {
     const checked = e.target.checked;
     document.querySelectorAll('#type-filter-checkboxes input[type="checkbox"]').forEach(cb => {
@@ -84,7 +108,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
 });
 
-// --- Polling control ---
 function startPolling(intervalMs) {
   if (pollTimer) {
     clearInterval(pollTimer);
@@ -98,10 +121,9 @@ function startPolling(intervalMs) {
   }
 }
 
-// --- Load spaces and populate dropdown ---
 async function loadSpaces() {
   try {
-    const res = await fetch('/api/spaces');
+    const res = await fetch(API_BASE + '/api/spaces');
     if (!res.ok) {
       console.error('Failed to load spaces');
       return;
@@ -111,7 +133,6 @@ async function loadSpaces() {
     const spaceSelect = document.getElementById('space-filter-select');
     if (!spaceSelect) return;
     
-    // Clear existing options except placeholder
     spaceSelect.innerHTML = '<option value="" disabled>Select a space...</option>';
     
     if (allSpaces.length === 0) {
@@ -119,7 +140,6 @@ async function loadSpaces() {
       return;
     }
     
-    // Populate dropdown
     allSpaces.forEach(space => {
       const option = document.createElement('option');
       option.value = space.id;
@@ -127,7 +147,6 @@ async function loadSpaces() {
       spaceSelect.appendChild(option);
     });
     
-    // Auto-select if only one space or restore from localStorage
     const savedSpace = localStorage.getItem('selectedSpace');
     if (allSpaces.length === 1) {
       currentSpace = allSpaces[0].id;
@@ -137,7 +156,6 @@ async function loadSpaces() {
       spaceSelect.value = currentSpace;
     }
     
-    // Load submissions if space is selected
     if (currentSpace) {
       await loadSubmissions();
     }
@@ -147,22 +165,25 @@ async function loadSpaces() {
   }
 }
 
-// --- Get filtered submissions for current space ---
 function getFilteredSubmissions() {
   if (!currentSpace) return [];
   return submissions.filter(s => s.spaceId === currentSpace);
 }
 
-// --- Initialize Control Center ---
+function getFilteredUncracked() {
+  const filtered = getFilteredSubmissions();
+  const selectedTypes = Array.from(
+    document.querySelectorAll('#type-filter-checkboxes input[type="checkbox"]:checked')
+  ).map(cb => cb.value);
+  
+  return filtered.filter(s => !s.cracked && selectedTypes.includes(s.passwordTypeId));
+}
+
 function initControlCenter() {
-  // Update mode UI first
   updateModeUI();
-  
-  // Populate type filters
   populateTypeFilters();
-  
-  // Initialize status
   updateStatus('IDLE');
+  updateSummary();
 }
 
 function populateTypeFilters() {
@@ -171,22 +192,42 @@ function populateTypeFilters() {
   
   const filteredSubs = getFilteredSubmissions();
   
-  const types = [
-    { id: 'birthday_ddmmyyyy', defaultChecked: true },  // Only birthday checked by default
-    { id: 'digits8', defaultChecked: false },           // Too large for browser
-    { id: 'lowercase8', defaultChecked: false }         // Way too large for browser
-  ];
+  // Get all password types from PasswordSpaces (dynamically loaded from backend)
+  const availableTypes = PasswordSpaces.types || [];
+  
+  if (availableTypes.length === 0) {
+    container.innerHTML = '<div style="color:#888;font-size:0.9em">Loading password types...</div>';
+    return;
+  }
+  
   container.innerHTML = '';
   
-  types.forEach(type => {
-    const badge = TYPE_BADGES[type.id];
+  // Build filters dynamically from backend types - ALWAYS show all types
+  availableTypes.forEach(type => {
+    const dictInfo = getDictionaryInfo(type.id);
     const count = filteredSubs.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
+    
+    // Only birthday checked by default (weakest type)
+    const defaultChecked = type.id === 'birthday';
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
+    label.title = dictInfo.tooltip;
+    
+    // Show count with visual indicator if 0
+    const countDisplay = count === 0 
+      ? '<span style="color:#444">[0]</span>' 
+      : `<span style="color:#666">[${count} left]</span>`;
+    
     label.innerHTML = `
-      <input type="checkbox" value="${type.id}" ${type.defaultChecked ? 'checked' : ''}>
-      <span>${badge.label} <span style="color:#666">[${count} left]</span></span>
+      <input type="checkbox" value="${type.id}" ${defaultChecked ? 'checked' : ''}>
+      <span>
+        <code style="color:#4c9aff;font-size:0.9em">${type.id}</code>
+        ${countDisplay}
+        <span style="color:#888;font-size:0.85em;margin-left:4px" title="${dictInfo.tooltip}">
+          📚 ${dictInfo.count === 0 ? 'None' : dictInfo.count + ' dict' + (dictInfo.count > 1 ? 's' : '')}
+        </span>
+      </span>
     `;
     container.appendChild(label);
   });
@@ -198,13 +239,11 @@ function updateModeUI() {
   const isSingle = mode === 'single';
   const isMulti = mode === 'multi';
   
-  // Update button visibility
   document.getElementById('btn-start-crack').style.display = isGPU ? 'none' : 'inline-block';
   document.getElementById('btn-download-gpu').style.display = isGPU ? 'inline-block' : 'none';
   
-  // Update info text - with null check
   const infoEl = document.getElementById('mode-info');
-  if (!infoEl) return;  // Guard clause
+  if (!infoEl) return;
   
   if (isGPU) {
     infoEl.innerHTML = 'Export: <span>Python script</span>';
@@ -215,37 +254,35 @@ function updateModeUI() {
   }
 }
 
-// --- Get worker count based on mode ---
 function getWorkerCount() {
   const mode = document.querySelector('input[name="crack-mode"]:checked').value;
   if (mode === 'single') return 1;
   if (mode === 'multi') return totalCores;
-  return 1; // Default
+  return 1;
 }
 
-// --- Load submissions from API ---
 async function loadSubmissions() {
   try {
-    const res = await fetch('/api/hashes');
+    const res = await fetch(API_BASE + '/api/hashes');
     if (!res.ok) return;
     const data = await res.json();
     submissions = Array.isArray(data) ? data : [];
     
-    // Filter by current space if selected
     const filteredSubs = getFilteredSubmissions();
     renderTable(filteredSubs);
     
-    // Update counts and type filters
     document.getElementById('sub-count').textContent = submissions.length;
     populateTypeFilters();
+    updateSummary();
     
-    updateStatus('IDLE');
+    if (!crackingState.active) {
+      updateStatus('IDLE');
+    }
   } catch (e) {
     console.error('Error loading submissions:', e);
   }
 }
 
-// --- Update status display ---
 function updateStatus(status, message = '') {
   const statusEl = document.getElementById('crack-status');
   if (!statusEl) return;
@@ -280,7 +317,331 @@ function updateStatus(status, message = '') {
   statusEl.style.color = statusColor;
 }
 
-// --- Render table ---
+function updateSummary() {
+  const filtered = getFilteredSubmissions();
+  const cracked = filtered.filter(s => s.cracked).length;
+  const total = filtered.length;
+  const remaining = total - cracked;
+  const percent = total > 0 ? Math.round((cracked / total) * 100) : 0;
+  
+  document.getElementById('summary-total').textContent = total;
+  document.getElementById('summary-cracked').textContent = `${cracked} (${percent}%)`;
+  document.getElementById('summary-remaining').textContent = remaining;
+  
+  if (crackingState.startTime) {
+    const elapsed = Date.now() - crackingState.startTime;
+    document.getElementById('summary-time').textContent = formatDuration(elapsed);
+  }
+}
+
+function formatDuration(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+// CRACKING LOGIC - Main implementation
+async function startCracking() {
+  const uncracked = getFilteredUncracked();
+  
+  if (uncracked.length === 0) {
+    updateStatus('ERROR', 'No uncracked hashes to process');
+    return;
+  }
+  
+  if (typeof workerPool === 'undefined') {
+    updateStatus('ERROR', 'Worker pool not initialized');
+    console.error('workerPool is not defined');
+    return;
+  }
+  
+  crackingState.active = true;
+  crackingState.paused = false;
+  crackingState.batch = uncracked;
+  crackingState.batchIndex = 0;
+  crackingState.startTime = Date.now();
+  crackingState.crackedCount = 0;
+  crackingState.totalAttempts = 0;
+  
+  updateStatus('CRACKING');
+  document.getElementById('btn-start-crack').style.display = 'none';
+  document.getElementById('btn-pause-crack').style.display = 'inline-block';
+  document.getElementById('btn-stop-crack').style.display = 'inline-block';
+  
+  const numWorkers = getWorkerCount();
+  console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
+  
+  workerPool.maxWorkers = numWorkers;
+  
+  await processBatch();
+}
+
+async function processBatch() {
+  while (crackingState.batchIndex < crackingState.batch.length && crackingState.active && !crackingState.paused) {
+    const submission = crackingState.batch[crackingState.batchIndex];
+    crackingState.currentId = submission.id;
+    crackingState.currentHash = submission.hash;
+    
+    document.getElementById('metric-hash').textContent = submission.hash.substring(0, 16) + '...';
+    document.getElementById('metric-phase').textContent = `Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+    
+    const passwordType = PasswordSpaces.getMetadata(submission.passwordTypeId);
+    if (!passwordType) {
+      console.error('Unknown password type:', submission.passwordTypeId);
+      crackingState.batchIndex++;
+      continue;
+    }
+    
+    const useDictionary = document.getElementById('opt-dictionary')?.checked;
+    const truncationMode = document.getElementById('opt-truncation')?.value || 'full';
+    
+    // Load dictionary for this specific password type
+    let dictionary = [];
+    if (useDictionary && typeof dictionaryLoader !== 'undefined') {
+      try {
+        console.log(`Loading dictionary for password type: ${passwordType.id}`);
+        dictionary = await dictionaryLoader.loadForType(passwordType);
+        
+        if (dictionary.length === 0) {
+          console.warn('⚠️ Dictionary failed to load or empty - using brute-force only');
+          updateStatus('CRACKING', 'Dictionary unavailable - using brute-force');
+        } else {
+          console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
+          updateStatus('CRACKING');
+        }
+      } catch (e) {
+        console.error('Failed to load dictionary for type:', passwordType.id, e);
+        updateStatus('CRACKING', 'Dictionary error - using brute-force only');
+        dictionary = [];
+      }
+    }
+    
+    const options = {
+      dictionary: dictionary,
+      truncationMode: truncationMode,
+      onProgress: updateProgress
+    };
+    
+    try {
+      const result = await workerPool.crack(submission.hash, passwordType, options);
+      
+      if (result.password) {
+        console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
+        await saveCrackedPassword(submission.id, result.password, result.attempts, result.duration);
+        crackingState.crackedCount++;
+      } else {
+        console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
+      }
+      
+      crackingState.totalAttempts += result.attempts;
+      
+    } catch (err) {
+      console.error('Error cracking hash:', err);
+    }
+    
+    crackingState.batchIndex++;
+    updateSummary();
+  }
+  
+  if (crackingState.batchIndex >= crackingState.batch.length) {
+    finishCracking();
+  }
+}
+
+function updateProgress(progress) {
+  document.getElementById('metric-candidate').textContent = progress.current || '—';
+  document.getElementById('metric-speed').textContent = formatSpeed(progress.speed || 0);
+  document.getElementById('metric-attempts').textContent = `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
+  
+  if (crackingState.startTime) {
+    const elapsed = Date.now() - crackingState.startTime;
+    document.getElementById('metric-elapsed').textContent = formatTime(elapsed);
+  }
+  
+  if (progress.total && progress.attempts) {
+    const percent = Math.min(100, (progress.attempts / progress.total) * 100);
+    document.getElementById('progress-fill').style.width = percent + '%';
+    document.getElementById('progress-text').textContent = Math.round(percent) + '%';
+    
+    if (progress.speed > 0 && progress.total > progress.attempts) {
+      const remaining = progress.total - progress.attempts;
+      const eta = Math.ceil(remaining / progress.speed) * 1000;
+      document.getElementById('metric-estimated').textContent = formatTime(eta);
+    }
+  }
+  
+  const phaseText = progress.phase === 'dictionary' ? 'Dictionary attack' : 'Brute-force';
+  document.getElementById('metric-phase').textContent = `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+}
+
+function formatSpeed(speed) {
+  if (speed >= 1000000) return (speed / 1000000).toFixed(1) + ' MH/s';
+  if (speed >= 1000) return (speed / 1000).toFixed(1) + ' KH/s';
+  return Math.round(speed) + ' H/s';
+}
+
+function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
+
+function formatTime(ms) {
+  if (ms < 1000) return ms + 'ms';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return seconds + 's';
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${secs}s`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+}
+
+async function saveCrackedPassword(id, password, attempts, durationMs) {
+  try {
+    const res = await fetch(API_BASE + `/api/crack/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: password,
+        attempts: attempts,
+        crackedAt: Date.now(),
+        crackDurationMs: durationMs
+      })
+    });
+    
+    if (res.ok) {
+      const sub = submissions.find(s => s.id === id);
+      if (sub) {
+        sub.password = password;
+        sub.cracked = true;
+        sub.crackedAt = Date.now();
+        sub.attempts = attempts;
+        sub.crackDurationMs = durationMs;
+      }
+      
+      const crackedCell = document.getElementById('crack-' + id);
+      if (crackedCell) {
+        crackedCell.innerHTML = '✅ <strong>' + password + '</strong>';
+        crackedCell.style.color = '#4cff80';
+      }
+    } else {
+      console.error('Failed to save cracked password:', res.status, await res.text());
+    }
+  } catch (err) {
+    console.error('Failed to save cracked password:', err);
+  }
+}
+
+function finishCracking() {
+  crackingState.active = false;
+  crackingState.paused = false;
+  
+  updateStatus('COMPLETE', `${crackingState.crackedCount} passwords cracked`);
+  
+  document.getElementById('btn-start-crack').style.display = 'inline-block';
+  document.getElementById('btn-pause-crack').style.display = 'none';
+  document.getElementById('btn-stop-crack').style.display = 'none';
+  
+  // Reset pause button text
+  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('progress-text').textContent = '100%';
+  
+  loadSubmissions();
+}
+
+function togglePause() {
+  if (crackingState.paused) {
+    resumeCracking();
+  } else {
+    pauseCracking();
+  }
+}
+
+function pauseCracking() {
+  crackingState.paused = true;
+  updateStatus('PAUSED');
+  document.getElementById('btn-pause-crack').textContent = '▶️ RESUME';
+  
+  if (workerPool) {
+    workerPool.cancel();
+  }
+}
+
+function resumeCracking() {
+  crackingState.paused = false;
+  updateStatus('CRACKING');
+  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
+  processBatch();
+}
+
+function stopCracking() {
+  crackingState.active = false;
+  crackingState.paused = false;
+  
+  if (workerPool) {
+    workerPool.cancel();
+  }
+  
+  updateStatus('IDLE', 'Stopped by user');
+  
+  document.getElementById('btn-start-crack').style.display = 'inline-block';
+  document.getElementById('btn-pause-crack').style.display = 'none';
+  document.getElementById('btn-stop-crack').style.display = 'none';
+  
+  // Reset pause button text in case it was paused
+  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
+  // Reset progress bar
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-text').textContent = '0%';
+  
+  document.getElementById('metric-hash').textContent = '—';
+  document.getElementById('metric-candidate').textContent = '—';
+  document.getElementById('metric-speed').textContent = '0 H/s';
+  document.getElementById('metric-attempts').textContent = '0 / 0';
+  document.getElementById('metric-estimated').textContent = '—';
+  document.getElementById('metric-phase').textContent = 'Stopped';
+  
+  loadSubmissions();
+}
+
+function downloadGPUScript() {
+  const uncracked = getFilteredUncracked();
+  
+  if (uncracked.length === 0) {
+    alert('No uncracked hashes to export');
+    return;
+  }
+  
+  let script = '#!/usr/bin/env python3\n';
+  script += '# GPU Password Cracking Script\n';
+  script += '# Generated by Password Hack Demo App\n\n';
+  script += 'hashes = [\n';
+  
+  uncracked.forEach(sub => {
+    script += `    {"hash": "${sub.hash}", "type": "${sub.passwordTypeId}", "id": "${sub.id}"},\n`;
+  });
+  
+  script += ']\n\n';
+  script += '# Use hashcat or similar tool to crack these hashes\n';
+  script += '# Example: hashcat -m 0 -a 3 hashes.txt ?d?d?d?d?d?d?d?d\n';
+  
+  const blob = new Blob([script], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'gpu-crack-' + new Date().toISOString().split('T')[0] + '.py';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderTable(subs) {
   const tbody = document.getElementById('submissions-tbody');
   if (!tbody) return;
@@ -294,7 +655,6 @@ function renderTable(subs) {
   subs.forEach((s, i) => {
     const cracked = s.cracked && s.password;
     const dur = cracked ? formatCrackDuration(s) : '';
-    const badge = TYPE_BADGES[s.passwordTypeId] || { label: s.passwordTypeId || '?', class: 'type-unknown' };
     
     const tr = document.createElement('tr');
     tr.id = 'row-' + s.id;
@@ -308,7 +668,7 @@ function renderTable(subs) {
     tr.innerHTML =
       '<td style="text-align:center;color:#666;font-size:0.85em">' + (i + 1) + '</td>' +
       '<td><code title="' + s.hash + '" style="font-size:0.8em;cursor:help;color:#aaa">' + s.hash.substring(0, 12) + '…</code></td>' +
-      '<td><span class="type-badge ' + badge.class + '">' + badge.label + '</span></td>' +
+      '<td><code style="color:#4c9aff;font-size:0.85em">' + (s.passwordTypeId || '?') + '</code></td>' +
       '<td id="crack-' + s.id + '" style="font-weight:bold;color:' + (cracked ? '#4cff80' : '#555') + '">' + crackedCell + '</td>' +
       '<td style="font-size:0.88em" class="hide-mobile">' + guessDeviceType(s.meta && s.meta.userAgent) + '</td>' +
       '<td style="font-family:monospace;font-size:0.82em;color:#aaa" class="hide-mobile">' + ((s.meta && s.meta.ip) || '—') + '</td>' +
@@ -333,49 +693,45 @@ function renderTable(subs) {
   };
 }
 
-// --- Device type + OS from User Agent ---
 function guessDeviceType(ua) {
   if (!ua || ua === 'unknown') return '❓ Unknown';
   if (/bot|crawler|spider|headless|python|curl|wget|go-http/i.test(ua)) return '🤖 Bot';
-
-  // Mobile OS
-  if (/iphone/i.test(ua))                          return '📱 iPhone (iOS)';
-  if (/ipad/i.test(ua))                            return '📟 iPad (iOS)';
-  if (/android/i.test(ua) && /mobile/i.test(ua))  return '📱 Android';
-  if (/android/i.test(ua))                         return '📟 Android Tablet';
-  if (/windows phone/i.test(ua))                   return '📱 Windows Phone';
-  if (/blackberry|bb10/i.test(ua))                 return '📱 BlackBerry';
-
-  // Desktop OS
-  if (/windows nt/i.test(ua))                      return '🖥 Desktop (Windows)';
-  if (/macintosh|mac os x/i.test(ua))              return '🖥 Desktop (macOS)';
-  if (/cros/i.test(ua))                            return '🖥 Desktop (ChromeOS)';
-  if (/linux/i.test(ua))                           return '🖥 Desktop (Linux)';
-
+  if (/iphone/i.test(ua)) return '📱 iPhone (iOS)';
+  if (/ipad/i.test(ua)) return '📟 iPad (iOS)';
+  if (/android/i.test(ua) && /mobile/i.test(ua)) return '📱 Android';
+  if (/android/i.test(ua)) return '📟 Android Tablet';
+  if (/windows phone/i.test(ua)) return '📱 Windows Phone';
+  if (/blackberry|bb10/i.test(ua)) return '📱 BlackBerry';
+  if (/windows nt/i.test(ua)) return '🖥 Desktop (Windows)';
+  if (/macintosh|mac os x/i.test(ua)) return '🖥 Desktop (macOS)';
+  if (/cros/i.test(ua)) return '🖥 Desktop (ChromeOS)';
+  if (/linux/i.test(ua)) return '🖥 Desktop (Linux)';
   return '🖥 Desktop';
 }
 
-// --- Crack duration ---
 function formatCrackDuration(sub) {
-  if (!sub.crackedAt || !sub.submitted) return '';
-  const ms = sub.crackedAt - sub.submitted;
+  if (!sub.crackDurationMs) return '';
+  const ms = sub.crackDurationMs;
   if (ms < 1000) return ms + 'ms';
-  return (ms / 1000).toFixed(1) + 's';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const minutes = Math.floor(ms / 60000);
+  const secs = ((ms % 60000) / 1000).toFixed(0);
+  return `${minutes}m ${secs}s`;
 }
 
-// --- Show metadata modal ---
 function showMeta(sub) {
   const payload = {
-    id:        sub.id,
-    hash:      sub.hash,
-    spaceId:   sub.spaceId,
+    id: sub.id,
+    hash: sub.hash,
+    spaceId: sub.spaceId,
     passwordTypeId: sub.passwordTypeId,
     submitted: sub.submitted ? new Date(sub.submitted).toISOString() : null,
-    cracked:   sub.cracked,
-    password:  sub.password || null,
+    cracked: sub.cracked,
+    password: sub.password || null,
     crackedAt: sub.crackedAt ? new Date(sub.crackedAt).toISOString() : null,
-    attempts:  sub.attempts,
-    meta:      sub.meta || {}
+    attempts: sub.attempts,
+    crackDurationMs: sub.crackDurationMs || null,
+    meta: sub.meta || {}
   };
   document.getElementById('meta-modal-body').innerHTML =
     '<pre style="margin:0;padding:1em;background:#0d1117;border-radius:6px;' +
@@ -386,60 +742,36 @@ function showMeta(sub) {
   document.getElementById('meta-modal').style.display = 'block';
 }
 
-// --- JSON syntax highlighter (VS Code dark theme colors) ---
 function syntaxHighlightJson(obj) {
   const json = JSON.stringify(obj, null, 2)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return json.replace(
     /(&quot;(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\&])*&quot;(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
     function(match) {
-      var cls = 'color:#ce9178'; // string value
+      var cls = 'color:#ce9178';
       if (/^&quot;/.test(match)) {
-        if (/:$/.test(match)) cls = 'color:#9cdcfe'; // key
+        if (/:$/.test(match)) cls = 'color:#9cdcfe';
       } else if (/true|false/.test(match)) {
-        cls = 'color:#569cd6'; // boolean
+        cls = 'color:#569cd6';
       } else if (/null/.test(match)) {
-        cls = 'color:#808080'; // null
+        cls = 'color:#808080';
       } else {
-        cls = 'color:#b5cea8'; // number
+        cls = 'color:#b5cea8';
       }
       return '<span style="' + cls + '">' + match + '</span>';
     }
   );
 }
 
-// --- Delete single ---
 async function deleteSingle(id) {
-  await fetch('/api/hash/' + id, { method: 'DELETE' });
+  await fetch(API_BASE + '/api/hash/' + id, { method: 'DELETE' });
   loadSubmissions();
 }
 
-// --- Delete all ---
 async function deleteAll() {
   if (!confirm('Delete ALL submissions?')) return;
-  await fetch('/api/clear', { method: 'POST' });
+  await fetch(API_BASE + '/api/clear', { method: 'POST' });
   loadSubmissions();
-}
-
-// --- Cracking functions (stubbed for new architecture) ---
-async function startCracking() {
-  updateStatus('CRACKING', 'Not yet implemented in new architecture');
-  // TODO: Implement with worker pool
-}
-
-function pauseCracking() {
-  updateStatus('PAUSED');
-  // TODO: Implement pause functionality
-}
-
-function stopCracking() {
-  updateStatus('IDLE');
-  // TODO: Implement stop functionality
-}
-
-function downloadGPUScript() {
-  // TODO: Generate and download GPU Python script
-  alert('GPU script download not yet implemented');
 }
 
 function exportCSV() {
@@ -449,7 +781,7 @@ function exportCSV() {
     return;
   }
   
-  let csv = 'ID,Hash,Type,Password,Cracked,Submitted,CrackedAt,Attempts,SpaceId,Device,IP\n';
+  let csv = 'ID,Hash,Type,Password,Cracked,Submitted,CrackedAt,Attempts,CrackDurationMs,SpaceId,Device,IP\n';
   filteredSubs.forEach(s => {
     const device = guessDeviceType(s.meta && s.meta.userAgent).replace(/,/g, ';');
     csv += [
@@ -461,6 +793,7 @@ function exportCSV() {
       s.submitted ? new Date(s.submitted).toISOString() : '',
       s.crackedAt ? new Date(s.crackedAt).toISOString() : '',
       s.attempts || '',
+      s.crackDurationMs || '',
       s.spaceId || '',
       '"' + device + '"',
       (s.meta && s.meta.ip) || ''
@@ -476,12 +809,11 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
-// --- Spaces management ---
 async function loadSpacesAdmin() {
   const tbody = document.getElementById('spaces-tbody');
   if (!tbody) return;
   try {
-    const res = await fetch('/api/spaces');
+    const res = await fetch(API_BASE + '/api/spaces');
     if (!res.ok) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Error loading spaces (API returned ' + res.status + ')</td></tr>';
       return;
@@ -512,7 +844,7 @@ async function loadSpacesAdmin() {
       const id = btn.getAttribute('data-spaceid');
       if (!id) return;
       if (!confirm('Delete space "' + id + '"?')) return;
-      await fetch('/api/spaces/' + id, { method: 'DELETE' });
+      await fetch(API_BASE + '/api/spaces/' + id, { method: 'DELETE' });
       loadSpacesAdmin();
     };
   } catch (e) {
@@ -532,7 +864,7 @@ async function saveSpaceFromForm() {
     return;
   }
   try {
-    const res = await fetch('/api/spaces', {
+    const res = await fetch(API_BASE + '/api/spaces', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({id, name, location, description})
