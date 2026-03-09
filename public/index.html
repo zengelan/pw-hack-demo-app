@@ -64,16 +64,9 @@
     .calendar-btn.hidden {
       display: none;
     }
-    .date-picker-section {
-      margin-top: 14px;
-      padding: 14px;
-      border: 1px solid #2a4a2a;
-      border-radius: 8px;
-      background: #0d1a0d;
-    }
     .hash-preview {
       margin-top: 14px;
-      margin-bottom: 20px;
+      margin-bottom: 0;
       padding: 16px;
       background: #0a0a1a;
       border: 1px solid #334;
@@ -365,19 +358,17 @@
 
     <input type="text" id="hidden-picker">
 
-    <div class="date-picker-section">
-      <!-- Live hash preview -->
-      <div class="hash-preview" id="hash-preview">
-        <div style="color:#8f8;font-size:0.95em;font-weight:600;" data-i18n="hashGeneratedLabel">&#x26A1; SHA-256 Hash Generated:</div>
-        <div class="hash-value" id="hash-preview-value">...</div>
-        <div class="fingerprint-text" data-i18n="fingerprintText">
-          This 64-character string is the <strong>"fingerprint"</strong> of your password.
-          It is the <strong>only thing</strong> sent to the server.
-        </div>
+    <!-- Live hash preview -->
+    <div class="hash-preview" id="hash-preview">
+      <div style="color:#8f8;font-size:0.95em;font-weight:600;" data-i18n="hashGeneratedLabel">&#x26A1; SHA-256 Hash Generated:</div>
+      <div class="hash-value" id="hash-preview-value">...</div>
+      <div class="fingerprint-text" data-i18n="fingerprintText">
+        This 64-character string is the <strong>"fingerprint"</strong> of your password.
+        It is the <strong>only thing</strong> sent to the server.
       </div>
     </div>
 
-    <button class="btn" id="submit-btn">Submit Hash to Instructor</button>
+    <button class="btn" id="submit-btn" style="margin-top: 20px;">Submit Hash to Instructor</button>
     <div id="status-msg"></div>
 
     <div class="meta-disclosure">
