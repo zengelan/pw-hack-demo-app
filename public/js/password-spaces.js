@@ -33,7 +33,15 @@ const PasswordSpaces = {
     if (!type) throw new Error(`Unknown password type: ${passwordTypeId}`);
     
     const strategy = type.bruteForceStrategy;
+    if (!strategy) {
+      console.warn(`Password type ${passwordTypeId} has no bruteForceStrategy defined`);
+      throw new Error(`Password type ${passwordTypeId} has no brute-force strategy`);
+    }
+    
     const generatorType = strategy.generatorType;
+    if (!generatorType) {
+      throw new Error(`Password type ${passwordTypeId} has no generatorType defined`);
+    }
     
     // Select generator implementation
     switch (generatorType) {
@@ -134,6 +142,10 @@ const PasswordSpaces = {
     if (!type) return 0;
     
     const strategy = type.bruteForceStrategy;
+    if (!strategy) {
+      console.warn(`Password type ${passwordTypeId} has no bruteForceStrategy`);
+      return 0;
+    }
     
     // Check truncation
     if (options.truncationMode) {
@@ -142,10 +154,10 @@ const PasswordSpaces = {
     }
     
     if (options.limit) {
-      return Math.min(options.limit, strategy.estimatedAttempts);
+      return Math.min(options.limit, strategy.estimatedAttempts || 0);
     }
     
-    return strategy.estimatedAttempts;
+    return strategy.estimatedAttempts || 0;
   },
   
   /**
