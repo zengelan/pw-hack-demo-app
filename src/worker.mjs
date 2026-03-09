@@ -1,6 +1,6 @@
 const APP_BRANCH_DEFAULT="main";
 const APP_NAME="pw-hack-demo-app";
-const MAX_HASHES=25, RATE_LIMIT_MS=500, HASHES_CACHE_TTL=5000, INDEX_KEY="__index__";
+const MAX_HASHES=50, RATE_LIMIT_MS=500, HASHES_CACHE_TTL=5000, INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 
 // ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ async function submit(req, env) {
   const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
   if (await rateLimited(ip)) return json({error: "Please wait 30 seconds between submissions."}, 429);
   const idx = await getIndex();
-  if (idx.length >= MAX_HASHES) return json({error: "Demo full. Max 25 submissions reached."}, 429);
+  if (idx.length >= MAX_HASHES) return json({error: "Demo full. Max 50 submissions reached."}, 429);
 
   const body = await req.json().catch(() => null);
   if (!body?.hash || !body?.spaceId) {
