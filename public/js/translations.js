@@ -16,17 +16,19 @@ const translations = {
     pwTypeDescription: "Before you enter your password, tell the system what <strong>kind</strong> of password you are using. The instructor&rsquo;s brute-force cracker uses this hint to pick the right <strong>search space</strong> to iterate through &mdash; so please choose honestly!",
     pwTypeWhyMatters: "&#x1F4CA; Why Does Password Type Matter?",
     pwTypeWhyMattersText: "Two passwords can produce completely different-looking SHA-256 hashes, yet one can be cracked in <strong style=\"color:#f88;\">milliseconds</strong> and the other would take <strong style=\"color:#8f8;\">millions of years</strong>. The difference is not the hash algorithm &mdash; it is the <em>size of the search space</em>.",
-    pwTypeCrackerWorks: "&#x1F50D; <strong>How the cracker works:</strong><br>For a <em>birthday</em> there are only ~27,000 plausible dates. The cracker hashes every single one in under 40&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password there are 218 trillion possibilities &mdash; the same approach would take years.",
+    pwTypeCrackerWorks: "&#x1F50D; <strong>How the cracker works:</strong><br>For a <em>birthday</em> there are only ~36,500 plausible dates. The cracker hashes every single one in under 40&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password there are 218 trillion possibilities &mdash; the same approach would take years.",
     
     // Password Type Descriptions (from backend API)
     pwTypeDescBirthday: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.",
     pwTypeDescDigits8: "An 8-digit numeric password like a PIN code (e.g. 12345678). Commonly used but extremely weak against brute-force attacks.",
     pwTypeDescLowercase8: "An 8-character password using only lowercase letters (e.g. 'password'). Larger search space than digits, but still vulnerable to dictionary and brute-force attacks.",
+    pwTypeDescAlphanumeric8: "An 8-character password using both lowercase and uppercase letters plus digits (e.g. 'Admin123', 'Pass2024'). More secure than lowercase-only but still vulnerable without special characters.",
     
     // Password Type Cracking Hints
-    pwTypeCrackHintBirthday: "Brute-forceable in milliseconds — only ~39k valid calendar dates.",
+    pwTypeCrackHintBirthday: "Brute-forceable in milliseconds — only ~36.5k valid calendar dates.",
     pwTypeCrackHintDigits8: "100 million combinations — crackable in under 2 minutes on a browser, instantly on a GPU.",
     pwTypeCrackHintLowercase8: "208 billion combinations — takes days in a browser, but only seconds on a GPU. Dictionary attacks crack common words instantly.",
+    pwTypeCrackHintAlphanumeric8: "Full brute-force takes years in browser (~6.9 years), but only hours on GPU (~2.8 hours). Common patterns (Admin123, Password1) are cracked instantly via dictionary attacks.",
     
     // Step 3
     step3Title: "Step 3: Enter Your Password",
@@ -83,7 +85,7 @@ const translations = {
     // Time estimates
     timeInstant: "Instant",
     time10ms: "~10 ms",
-    time37ms: "~37 ms",
+    time36ms: "~36 ms",
     time1sec: "~1 second",
     time24days: "~2.4 days",
     time95sec: "~9.5 seconds",
@@ -142,17 +144,19 @@ const translations = {
     pwTypeDescription: "Bevor du dein Passwort eingibst, teile dem System mit, welche <strong>Art</strong> von Passwort du verwendest. Der Brute-Force-Cracker des Dozenten nutzt diesen Hinweis, um den richtigen <strong>Suchraum</strong> zu durchlaufen &mdash; bitte wähle ehrlich!",
     pwTypeWhyMatters: "&#x1F4CA; Warum ist der Passworttyp wichtig?",
     pwTypeWhyMattersText: "Zwei Passwörter können völlig unterschiedlich aussehende SHA-256-Hashes erzeugen, dennoch kann das eine in <strong style=\"color:#f88;\">Millisekunden</strong> geknackt werden und das andere würde <strong style=\"color:#8f8;\">Millionen Jahre</strong> dauern. Der Unterschied liegt nicht im Hash-Algorithmus &mdash; sondern in der <em>Größe des Suchraums</em>.",
-    pwTypeCrackerWorks: "&#x1F50D; <strong>So funktioniert der Cracker:</strong><br>Für ein <em>Geburtsdatum</em> gibt es nur ~27.000 plausible Daten. Der Cracker hasht jedes einzelne in unter 40&nbsp;ms und findet sofort eine Übereinstimmung. Für ein <em>8-stelliges alphanumerisches</em> Passwort gibt es 218 Billionen Möglichkeiten &mdash; derselbe Ansatz würde Jahre dauern.",
+    pwTypeCrackerWorks: "&#x1F50D; <strong>So funktioniert der Cracker:</strong><br>Für ein <em>Geburtsdatum</em> gibt es nur ~36.500 plausible Daten. Der Cracker hasht jedes einzelne in unter 40&nbsp;ms und findet sofort eine Übereinstimmung. Für ein <em>8-stelliges alphanumerisches</em> Passwort gibt es 218 Billionen Möglichkeiten &mdash; derselbe Ansatz würde Jahre dauern.",
     
     // Password Type Descriptions (from backend API)
     pwTypeDescBirthday: "Ein 8-stelliges Passwort abgeleitet von einem Geburtsdatum im Format TTMMJJJJ (z.B. 15081990). Sehr verbreitet und sehr leicht zu knacken.",
     pwTypeDescDigits8: "Ein 8-stelliges numerisches Passwort wie ein PIN-Code (z.B. 12345678). Häufig verwendet, aber extrem schwach gegen Brute-Force-Angriffe.",
     pwTypeDescLowercase8: "Ein 8-stelliges Passwort nur aus Kleinbuchstaben (z.B. 'password'). Größerer Suchraum als Ziffern, aber immer noch anfällig für Wörterbuch- und Brute-Force-Angriffe.",
+    pwTypeDescAlphanumeric8: "Ein 8-stelliges Passwort mit Klein- und Großbuchstaben plus Ziffern (z.B. 'Admin123', 'Pass2024'). Sicherer als nur Kleinbuchstaben, aber ohne Sonderzeichen immer noch anfällig.",
     
     // Password Type Cracking Hints
-    pwTypeCrackHintBirthday: "Per Brute-Force in Millisekunden knackbar — nur ~39k gültige Kalenderdaten.",
+    pwTypeCrackHintBirthday: "Per Brute-Force in Millisekunden knackbar — nur ~36,5k gültige Kalenderdaten.",
     pwTypeCrackHintDigits8: "100 Millionen Kombinationen — knackbar in unter 2 Minuten im Browser, sofort auf einer GPU.",
     pwTypeCrackHintLowercase8: "208 Milliarden Kombinationen — dauert Tage im Browser, aber nur Sekunden auf einer GPU. Wörterbuchangriffe knacken gängige Wörter sofort.",
+    pwTypeCrackHintAlphanumeric8: "Vollständiges Brute-Force dauert Jahre im Browser (~6,9 Jahre), aber nur Stunden auf GPU (~2,8 Stunden). Gängige Muster (Admin123, Password1) werden sofort per Wörterbuchangriff geknackt.",
     
     // Step 3
     step3Title: "Schritt 3: Gib dein Passwort ein",
@@ -209,7 +213,7 @@ const translations = {
     // Time estimates
     timeInstant: "Sofort",
     time10ms: "~10 ms",
-    time37ms: "~37 ms",
+    time36ms: "~36 ms",
     time1sec: "~1 Sekunde",
     time24days: "~2,4 Tage",
     time95sec: "~9,5 Sekunden",

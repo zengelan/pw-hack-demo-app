@@ -65,9 +65,9 @@ async function loadPasswordTypes() {
       description: 'An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.',
       format: 'DDMMYYYY',
       regex: '^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-6])$',
-      possibleValues: 38797,
+      possibleValues: 36525,
       exampleValues: ['01011990', '24121985', '07031975'],
-      crackingHint: 'Brute-forceable in milliseconds — only ~39k valid calendar dates.',
+      crackingHint: 'Brute-forceable in milliseconds — only ~36.5k valid calendar dates.',
       weaknessLevel: 'very_high'
     }];
   }
@@ -217,6 +217,14 @@ function onPasswordTypeChange(type) {
         }
       };
       pwInput.addEventListener('input', lowercaseInputHandler);
+    } else if (type.id === 'alphanumeric8') {
+      // Alphanumeric: text, 8 chars, preserve case
+      pwInput.setAttribute('maxlength', '8');
+      pwInput.setAttribute('inputmode', 'text');
+      pwInput.setAttribute('pattern', '[a-zA-Z0-9]{8}');
+      pwInput.setAttribute('autocomplete', 'off');
+      pwInput.setAttribute('spellcheck', 'false');
+      pwInput.setAttribute('aria-label', 'Enter 8 alphanumeric characters (letters and numbers)');
     } else if (type.length) {
       // Generic: infer from length property
       pwInput.setAttribute('maxlength', type.length.toString());
