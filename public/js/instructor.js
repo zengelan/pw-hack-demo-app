@@ -505,7 +505,7 @@ async function crackSingle(submission, options = {}) {
   
   // Load dictionary if needed
   let dictionary = [];
-  if (options.useDictionary !== false && passwordType.bruteForceStrategy.dictionarySupport) {
+  if (options.useDictionary !== false && passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.dictionarySupport) {
     cell.innerHTML = `<span style="color:#888">Loading dictionary…</span>`;
     dictionary = await dictionaryLoader.loadForType(passwordType);
   }
@@ -513,19 +513,26 @@ async function crackSingle(submission, options = {}) {
   // Configure options
   const crackOptions = { dictionary };
   
-  // Apply truncation
+  // Apply truncation - with null checks
   if (options.truncationMode && options.truncationMode !== 'full') {
-    const mode = passwordType.bruteForceStrategy.truncationModes?.find(
-      m => m.name === options.truncationMode
-    );
-    if (mode) {
-      crackOptions.truncationMode = mode.name;
-      crackOptions.limit = mode.limit;
+    // Check if bruteForceStrategy and truncationModes exist
+    if (passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.truncationModes) {
+      const mode = passwordType.bruteForceStrategy.truncationModes.find(
+        m => m.name === options.truncationMode
+      );
+      if (mode) {
+        crackOptions.truncationMode = mode.name;
+        crackOptions.limit = mode.limit;
+      }
     }
   } else if (passwordType.id === 'lowercase8') {
-    // Default truncation for lowercase8
-    const mode = passwordType.bruteForceStrategy.truncationModes.find(m => m.name === 'first_10M');
-    crackOptions.limit = mode.limit;
+    // Default truncation for lowercase8 - with null checks
+    if (passwordType.bruteForceStrategy && passwordType.bruteForceStrategy.truncationModes) {
+      const mode = passwordType.bruteForceStrategy.truncationModes.find(m => m.name === 'first_10M');
+      if (mode) {
+        crackOptions.limit = mode.limit;
+      }
+    }
   }
   
   // Progress callback
