@@ -91,7 +91,6 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
       ],
       dictionaryFilterRegex: "^[0-9]{8}$",
@@ -148,10 +147,9 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt",
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt",
         "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt",
-        "https://github.com/first20hours/google-10000-english/raw/master/google-10000-english-no-swears.txt"
+        "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt"
       ],
       dictionaryFilterRegex: "^[a-z]{8}$",
       dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick real words (password, sunshine, etc.)",
@@ -209,8 +207,7 @@ const PASSWORD_TYPES = [
       
       dictionarySupport: true,
       dictionaryUrls: [
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt"
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
       ],
       dictionaryFilterRegex: "^[a-zA-Z0-9]{8}$",
       dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick predictable patterns (Admin123, Password1, etc.)",

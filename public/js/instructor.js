@@ -403,9 +403,17 @@ async function processBatch() {
       try {
         console.log(`Loading dictionary for password type: ${passwordType.id}`);
         dictionary = await dictionaryLoader.loadForType(passwordType);
-        console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
+        
+        if (dictionary.length === 0) {
+          console.warn('⚠️ Dictionary failed to load or empty - using brute-force only');
+          updateStatus('CRACKING', 'Dictionary unavailable - using brute-force');
+        } else {
+          console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
+          updateStatus('CRACKING');
+        }
       } catch (e) {
         console.error('Failed to load dictionary for type:', passwordType.id, e);
+        updateStatus('CRACKING', 'Dictionary error - using brute-force only');
         dictionary = [];
       }
     }
