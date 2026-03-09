@@ -15,9 +15,15 @@
 
 <div class="container">
 
-  <!-- Stats Bar -->
+  <!-- Stats Bar with Space Filter -->
   <div class="stats-bar">
-    <div class="stat">Submissions: <span id="sub-count">0</span> / 25</div>
+    <div class="stat" style="display:flex;align-items:center;gap:8px">
+      <span style="color:#4fc3f7;font-weight:600">🏫 Space:</span>
+      <select id="space-filter-select" style="background:#1a1a2e;color:#eee;border:1px solid #4fc3f7;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.95em;min-width:150px;font-weight:500">
+        <option value="" disabled selected>Select a space...</option>
+      </select>
+    </div>
+    <div class="stat">Submissions: <span id="sub-count">0</span> / 50</div>
     <div class="stat" style="display:flex;align-items:center;gap:6px;white-space:nowrap">
       Auto-refresh:
       <select id="poll-interval-select" style="background:#1a1a2e;color:#eee;border:1px solid #444;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.95em;width:52px;text-align:center;appearance:none;-webkit-appearance:none;-moz-appearance:none;padding-right:4px">
@@ -28,40 +34,185 @@
         <option value="0" selected>Off</option>
       </select>
     </div>
-    <button class="btn btn-success" id="btn-crack-all">Crack All</button>
-    <button class="btn btn-danger" id="btn-delete-all">Delete All</button>
+    <button class="btn" id="btn-refresh" style="background:#444">🔄 Refresh</button>
   </div>
-
-  <!-- Crack Progress -->
-  <div id="crack-progress"></div>
 
   <!-- Submissions Table -->
   <div class="card">
-    <h2>&#128203; Submitted Hashes</h2>
+    <h2>📋 Submitted Hashes & Results</h2>
     <div style="overflow-x:auto">
       <table class="submissions-table">
         <thead>
           <tr>
             <th style="width:36px">#</th>
             <th style="width:130px">Hash</th>
-            <th style="min-width:180px">&#128272; Cracked Password</th>
+            <th style="width:120px">Type</th>
+            <th style="min-width:180px">Cracked Password</th>
             <th style="width:170px">Device</th>
             <th style="width:115px">IP</th>
             <th style="width:100px">Space</th>
             <th style="width:80px">Time</th>
-            <th style="width:110px">Actions</th>
+            <th style="width:130px">Actions</th>
           </tr>
         </thead>
         <tbody id="submissions-tbody">
-          <tr><td colspan="8" style="text-align:center;color:#666">No submissions yet. Waiting...</td></tr>
+          <tr><td colspan="9" style="text-align:center;color:#666">Select a space to view submissions...</td></tr>
         </tbody>
       </table>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-danger" id="btn-delete-all">🗑 Delete All</button>
+      <button class="btn" id="btn-export-csv" style="background:#555">📊 Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Brute-Force Control Center -->
+  <div class="card control-center" id="control-center">
+    <h2>⚡ Brute-Force Control Center</h2>
+    
+    <div class="control-grid">
+      <!-- Mode Selection -->
+      <div class="control-panel">
+        <h3>Mode Selection</h3>
+        <label class="radio-label">
+          <input type="radio" name="crack-mode" value="single" checked>
+          <span>CPU Single-Core</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="crack-mode" value="multi">
+          <span>CPU Multi-Core</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="crack-mode" value="gpu">
+          <span>GPU Export</span>
+        </label>
+        <p class="mode-info" id="mode-info">Workers: <span id="worker-count">1</span> thread</p>
+      </div>
+
+      <!-- Password Type Filter -->
+      <div class="control-panel">
+        <h3>Password Type Filter</h3>
+        <div id="type-filter-checkboxes">
+          <!-- Dynamically populated -->
+        </div>
+        <label class="checkbox-label" style="margin-top:8px;color:#888;font-size:0.9em">
+          <input type="checkbox" id="select-all-types">
+          <span>Toggle All</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Advanced Options -->
+    <div class="advanced-options">
+      <h3>Advanced Options</h3>
+      <div class="options-grid">
+        <div class="option-item">
+          <label>Dictionary Attack:
+            <input type="checkbox" id="opt-dictionary" checked class="toggle-switch">
+            <span class="toggle-label"></span>
+          </label>
+          <p class="option-hint">Try common passwords first</p>
+        </div>
+        <div class="option-item">
+          <label>Truncation Mode:
+            <select id="opt-truncation" class="option-select">
+              <option value="full">Full Search</option>
+              <option value="first_1M">First 1M</option>
+              <option value="first_10M" selected>First 10M</option>
+              <option value="dictionary_only">Dictionary Only</option>
+            </select>
+          </label>
+          <p class="option-hint">For large password spaces</p>
+        </div>
+        <div class="option-item">
+          <label>Priority Order:
+            <select id="opt-priority" class="option-select">
+              <option value="recent" selected>Recent First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="by_type">By Type</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
+          <p class="option-hint">Order to process hashes</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Display -->
+    <div class="status-panel">
+      <div class="status-header">
+        <span>Status: <strong id="crack-status">IDLE</strong></span>
+      </div>
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+        <span class="progress-text" id="progress-text">0%</span>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric">
+          <span class="metric-label">Current Hash:</span>
+          <span class="metric-value" id="metric-hash">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Candidate:</span>
+          <span class="metric-value" id="metric-candidate">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Speed:</span>
+          <span class="metric-value" id="metric-speed">0 H/s</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Attempts:</span>
+          <span class="metric-value" id="metric-attempts">0 / 0</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Elapsed:</span>
+          <span class="metric-value" id="metric-elapsed">00:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Estimated:</span>
+          <span class="metric-value" id="metric-estimated">—</span>
+        </div>
+        <div class="metric" style="grid-column:1/-1">
+          <span class="metric-label">Phase:</span>
+          <span class="metric-value" id="metric-phase">Waiting...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="control-buttons">
+      <button class="btn btn-success" id="btn-start-crack">▶️ START CRACKING</button>
+      <button class="btn" id="btn-pause-crack" style="background:#ff9800;display:none">⏸️ PAUSE</button>
+      <button class="btn btn-danger" id="btn-stop-crack" style="display:none">⏹️ STOP</button>
+      <button class="btn" id="btn-download-gpu" style="background:#6a1b9a;display:none">📥 DOWNLOAD GPU SCRIPT</button>
+    </div>
+
+    <!-- Results Summary -->
+    <div class="results-summary">
+      <div class="summary-item">
+        <span class="summary-label">Total:</span>
+        <span class="summary-value" id="summary-total">0</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Cracked:</span>
+        <span class="summary-value" id="summary-cracked">0 (0%)</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Remaining:</span>
+        <span class="summary-value" id="summary-remaining">0</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Total Time:</span>
+        <span class="summary-value" id="summary-time">00:00:00</span>
+      </div>
     </div>
   </div>
 
   <!-- Spaces Management -->
   <div class="card">
-    <h2>Spaces Management</h2>
+    <h2>🏫 Spaces Management</h2>
     <p style="color:#aaa;font-size:0.9em">Spaces define which class or group is participating. Students pick a space when submitting their hash.</p>
     <div style="overflow-x:auto">
       <table>
@@ -86,33 +237,33 @@
       <input id="space-location-input" type="text" placeholder="Location (e.g. Room 201)" style="padding:0.4em;background:#1a1a2e;color:#eee;border:1px solid #444">
       <input id="space-desc-input" type="text" placeholder="Description (optional)" style="padding:0.4em;background:#1a1a2e;color:#eee;border:1px solid #444">
     </div>
-    <button class="btn btn-success" id="btn-save-space" style="margin-top:0.5em">Save Space</button>
+    <button class="btn btn-success" id="btn-save-space" style="margin-top:0.5em">💾 Save Space</button>
     <span id="space-save-status" style="margin-left:1em"></span>
   </div>
 
   <!-- QR Code Card -->
   <div class="card" style="text-align:center">
-    <h2>App Deployment QR Code</h2>
+    <h2>📱 App Deployment QR Code</h2>
     <p style="color:#aaa;font-size:0.9em">Share this QR code with students to access the demo app. Click to enlarge.</p>
     <div id="qrcode-container"
          style="display:inline-block;cursor:pointer;border:4px solid #444;border-radius:8px;padding:8px;background:#fff"
          title="Click to open full-size QR in new tab"></div>
-    <p style="color:#aaa;font-size:0.85em;margin-top:0.5em">&#128269; Click QR code to open full-size in new tab</p>
+    <p style="color:#aaa;font-size:0.85em;margin-top:0.5em">🔍 Click QR code to open full-size in new tab</p>
     <p><a href="https://pw-hack-demo.apps.zengel.cloud" target="_blank" style="color:#4fc3f7">https://pw-hack-demo.apps.zengel.cloud</a></p>
   </div>
 
   <!-- IP / Country / ASN Allowlist -->
   <div class="card">
-    <h2>IP / Country / ASN Allowlist</h2>
-    <p>One entry per line. Supports: IP (1.2.3.4), CIDR (1.2.3.0/24), country code (DE), ASN (AS1234)</p>
+    <h2>🛡️ IP / Country / ASN Allowlist</h2>
+    <p style="color:#aaa;font-size:0.9em">One entry per line. Supports: IP (1.2.3.4), CIDR (1.2.3.0/24), country code (DE), ASN (AS1234)</p>
     <textarea id="allowlist-editor" rows="8" style="width:100%;background:#0d1117;color:#eee;border:1px solid #444;padding:0.5em;font-family:monospace"></textarea>
-    <button class="btn btn-success" onclick="saveAllowlist()">Save Allowlist</button>
+    <button class="btn btn-success" onclick="saveAllowlist()">💾 Save Allowlist</button>
     <span id="allowlist-status" style="margin-left:1em"></span>
   </div>
 
   <!-- Additional Information -->
   <div class="card">
-    <h2>&#128196; Additional Information</h2>
+    <h2>📄 Additional Information</h2>
     <p style="color:#aaa;font-size:0.9em">Historical deployment information and notes collected over time.</p>
     <ul style="color:#ccc;line-height:2;font-size:0.95em">
       <li><strong>Previous URL (workers.dev, 2026-03-07):</strong>
@@ -129,12 +280,16 @@
   <div style="background:#1a1a2e;margin:4vh auto;max-width:680px;border-radius:10px;padding:1.5em;border:1px solid #444;position:relative">
     <button onclick="document.getElementById('meta-modal').style.display='none'"
       style="position:absolute;top:0.8em;right:1em;background:none;border:none;color:#aaa;font-size:1.5em;cursor:pointer;line-height:1">&#x2715;</button>
-    <h3 style="margin-top:0;color:#4fc3f7">&#128225; Submission Details</h3>
+    <h3 style="margin-top:0;color:#4fc3f7">🔍 Submission Details</h3>
     <div id="meta-modal-body"></div>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Load modules in dependency order -->
+<script src="js/password-spaces.js"></script>
+<script src="js/dictionary-loader.js"></script>
+<script src="js/worker-pool.js"></script>
 <script src="js/instructor.js"></script>
 <script>
   const APP_URL = "https://pw-hack-demo.apps.zengel.cloud";
@@ -206,7 +361,6 @@
   });
 </script>
 
-  
 <!-- Version Footer -->
 <footer style="text-align:center;padding:12px 0 8px;margin-top:32px;border-top:1px solid #222;">
   <span id="version-footer" style="font-size:0.7em;color:#555;font-family:monospace;">ui: v0.0.1 &nbsp;|&nbsp; backend: …</span>

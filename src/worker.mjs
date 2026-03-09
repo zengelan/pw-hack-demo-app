@@ -1,6 +1,6 @@
 const APP_BRANCH_DEFAULT="main";
 const APP_NAME="pw-hack-demo-app";
-const MAX_HASHES=25, RATE_LIMIT_MS=500, HASHES_CACHE_TTL=5000, INDEX_KEY="__index__";
+const MAX_HASHES=50, RATE_LIMIT_MS=500, HASHES_CACHE_TTL=5000, INDEX_KEY="__index__";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 
 // ---------------------------------------------------------------------------
@@ -22,8 +22,36 @@ const PASSWORD_TYPES = [
     possibleValuesNote: "Approx. 365.25 days × 106 years (1920–2026), reduced for invalid day/month combos (e.g., Feb 30). This includes birthdates of ancestors, the user, and descendants. Far smaller than a full 8-digit space.",
     exampleValues: ["01011990", "24121985", "07031975", "15082020"],
     crackingHint: "Brute-forceable in milliseconds — the year range and calendar constraints reduce the space to ~39k values.",
-    weaknessLevel: "very_high"
+    weaknessLevel: "very_high",
+    
+    // Brute-force strategy metadata
+    bruteForceStrategy: {
+      method: "calendar_iteration",
+      description: "Iterate all valid calendar dates in DDMMYYYY format",
+      estimatedAttempts: 38797,
+      estimatedTimeMs: 40,
+      estimatedTimeGpuMs: 2,
+      order: "descending_year",
+      
+      parameters: {
+        yearStart: 2020,
+        yearEnd: 1940,
+        direction: "backward"
+      },
+      
+      generatorType: "calendar",
+      generatorConfig: {
+        yearRange: [1940, 2020],
+        orderBy: "year_desc"
+      },
+      
+      dictionarySupport: false,
+      truncationSupport: false,
+      
+      gpuShaderHint: "Use compute shader with parallel date validation. Split year ranges across workgroups."
+    }
   },
+  
   {
     id: "digits8",
     label: "8-Digit PIN (00000000–99999999)",
@@ -38,8 +66,49 @@ const PASSWORD_TYPES = [
     possibleValuesNote: "10^8 = 100,000,000 (100 million). Much larger than birthday space but still feasible for GPU-accelerated cracking.",
     exampleValues: ["00000000", "12345678", "87654321", "39471628"],
     crackingHint: "A modern GPU can exhaust all 100M combinations in seconds for unsalted SHA-256. Sequential patterns (12345678) are found near-instantly.",
-    weaknessLevel: "high"
+    weaknessLevel: "high",
+    
+    bruteForceStrategy: {
+      method: "sequential_numeric",
+      description: "Iterate 00000000 to 99999999 sequentially",
+      estimatedAttempts: 100000000,
+      estimatedTimeMs: 100000,
+      estimatedTimeGpuMs: 4500,
+      order: "ascending",
+      
+      parameters: {
+        start: 0,
+        end: 99999999,
+        padLength: 8
+      },
+      
+      generatorType: "numeric_range",
+      generatorConfig: {
+        min: 0,
+        max: 99999999,
+        padding: 8
+      },
+      
+      dictionarySupport: true,
+      dictionaryUrls: [
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
+      ],
+      dictionaryFilterRegex: "^[0-9]{8}$",
+      dictionaryNote: "Try common PINs (12345678, 00000000, etc.) before full brute-force",
+      
+      truncationSupport: true,
+      truncationModes: [
+        { name: "first_1M", limit: 1000000, description: "Try first 1 million (00000000-00999999)" },
+        { name: "first_10M", limit: 10000000, description: "Try first 10 million" },
+        { name: "full", limit: 100000000, description: "Full space (100M)" }
+      ],
+      defaultTruncationMode: "first_10M",
+      
+      gpuShaderHint: "Trivial parallel iteration. Split range across workgroups. Each thread processes sequential block."
+    }
   },
+  
   {
     id: "lowercase8",
     label: "8 Lowercase Letters (a–z)",
@@ -54,7 +123,51 @@ const PASSWORD_TYPES = [
     possibleValuesNote: "26^8 ≈ 208.8 billion. Significantly harder to brute-force than digits alone, but dictionary attacks on real words are still very effective.",
     exampleValues: ["password", "sunshine", "abcdefgh", "qwertyui"],
     crackingHint: "Full brute-force takes longer (~minutes on GPU), but common words and patterns are cracked instantly via dictionary attacks. No special chars means no entropy boost.",
-    weaknessLevel: "medium"
+    weaknessLevel: "medium",
+    
+    bruteForceStrategy: {
+      method: "combinatorial_iteration",
+      description: "Iterate all 26^8 combinations of lowercase letters",
+      estimatedAttempts: 208827064576,
+      estimatedTimeMs: 208827064,
+      estimatedTimeGpuMs: 9492,
+      order: "lexicographic",
+      
+      parameters: {
+        charset: "abcdefghijklmnopqrstuvwxyz",
+        length: 8,
+        startFrom: "aaaaaaaa"
+      },
+      
+      generatorType: "combinatorial",
+      generatorConfig: {
+        alphabet: "abcdefghijklmnopqrstuvwxyz",
+        length: 8,
+        orderType: "lexicographic"
+      },
+      
+      dictionarySupport: true,
+      dictionaryUrls: [
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt",
+        "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt",
+        "https://github.com/first20hours/google-10000-english/raw/master/google-10000-english-no-swears.txt"
+      ],
+      dictionaryFilterRegex: "^[a-z]{8}$",
+      dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick real words (password, sunshine, etc.)",
+      dictionaryPriority: "required",
+      
+      truncationSupport: true,
+      truncationModes: [
+        { name: "dictionary_only", limit: 0, description: "Dictionary attack only, no brute-force" },
+        { name: "first_1M", limit: 1000000, description: "Dictionary + first 1M combinations" },
+        { name: "first_100M", limit: 100000000, description: "Dictionary + first 100M combinations" },
+        { name: "full", limit: 208827064576, description: "Full space (209B) - IMPRACTICAL in browser" }
+      ],
+      defaultTruncationMode: "first_1M",
+      
+      gpuShaderHint: "Use parallel base-26 counter. Each workgroup handles range. Convert counter to string. Highly parallelizable."
+    }
   }
 ];
 
@@ -201,6 +314,80 @@ function passwordTypes() {
   return json({ types: PASSWORD_TYPES });
 }
 
+// --- GPU Export ---
+async function exportGpuScript(req, env) {
+  const body = await req.json().catch(() => null);
+  if (!body || !Array.isArray(body.remainingHashes)) {
+    return json({error: 'Missing remainingHashes array'}, 400);
+  }
+  
+  const { remainingHashes, exportMetadata } = body;
+  
+  // Fetch full hash details from KV
+  const hashDetails = await Promise.all(
+    remainingHashes.map(async (hashId) => {
+      const value = await KV_HASHES.get(hashId);
+      return value ? JSON.parse(value) : null;
+    })
+  );
+  
+  const validHashes = hashDetails.filter(Boolean);
+  
+  if (validHashes.length === 0) {
+    return json({error: 'No valid hashes to export'}, 400);
+  }
+  
+  // Generate export ID and timestamp
+  const exportId = crypto.randomUUID();
+  const exportTimestamp = new Date().toISOString();
+  
+  // Prepare export metadata
+  const metadata = {
+    exportId,
+    exportTimestamp,
+    instructorSession: exportMetadata?.instructorSession || 'unknown',
+    totalSubmissions: exportMetadata?.totalSubmissions || 0,
+    crackedCount: exportMetadata?.crackedCount || 0,
+    remainingCount: validHashes.length,
+    browserAttempts: exportMetadata?.browserAttempts || 0,
+    browserDurationMs: exportMetadata?.browserDurationMs || 0,
+    stoppedReason: exportMetadata?.stoppedReason || 'user_stop'
+  };
+  
+  // Load template
+  const templateUrl = new URL('/python-templates/gpu-cracker-template.py', req.url);
+  let template;
+  
+  try {
+    const res = await fetch(templateUrl.toString());
+    if (!res.ok) throw new Error(`Template fetch failed: ${res.status}`);
+    template = await res.text();
+  } catch (e) {
+    console.error('Failed to load template:', e);
+    return json({error: 'Failed to load template'}, 500);
+  }
+  
+  // Get server URL
+  const serverUrl = new URL(req.url).origin;
+  
+  // Inject data into template
+  const script = template
+    .replace('{{HASHES_JSON}}', JSON.stringify(validHashes, null, 2))
+    .replace('{{PASSWORD_TYPES_JSON}}', JSON.stringify(PASSWORD_TYPES, null, 2))
+    .replace('{{EXPORT_METADATA_JSON}}', JSON.stringify(metadata, null, 2))
+    .replace('{{SERVER_URL}}', serverUrl);
+  
+  // Return as downloadable file
+  return new Response(script, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/x-python',
+      'Content-Disposition': `attachment; filename="gpu-cracker-${exportId.substring(0, 8)}.py"`,
+      ...CORS
+    }
+  });
+}
+
 // --- Version ---
 function version(env) {
   const v = env?.APP_VERSION ?? "dev";
@@ -239,7 +426,7 @@ async function submit(req, env) {
   const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
   if (await rateLimited(ip)) return json({error: "Please wait 30 seconds between submissions."}, 429);
   const idx = await getIndex();
-  if (idx.length >= MAX_HASHES) return json({error: "Demo full. Max 25 submissions reached."}, 429);
+  if (idx.length >= MAX_HASHES) return json({error: "Demo full. Max 50 submissions reached."}, 429);
 
   const body = await req.json().catch(() => null);
   if (!body?.hash || !body?.spaceId) {
@@ -354,6 +541,7 @@ export default {
     if (p === "/api/allowlist"      && req.method === "POST")   return updateAllowlist(req);
     if (p === "/api/spaces"         && req.method === "GET")    return listSpaces();
     if (p === "/api/spaces"         && req.method === "POST")   return createOrUpdateSpace(req);
+    if (p === "/api/export-gpu-script" && req.method === "POST") return exportGpuScript(req, env);
 
     const mSpace = p.match(/^\/api\/spaces\/([^/]+)$/);
     if (mSpace && req.method === "DELETE") return deleteSpace(mSpace[1]);
