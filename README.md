@@ -7,6 +7,10 @@ A live classroom demo tool that shows students **how easily weak, unsalted SHA-2
 **Live demo:** [https://pw-hack-demo-app.andreas-zengel.workers.dev/](https://pw-hack-demo-app.andreas-zengel.workers.dev/)  
 **Custom domain:** [https://pw-hack-demo.apps.zengel.cloud/](https://pw-hack-demo.apps.zengel.cloud/)
 
+**Cloudflare Dashboards:**
+- **Pages:** [https://dash.cloudflare.com/941962c9311eef365b254a2c6eea3e58/pages/view/pw-hack-demo](https://dash.cloudflare.com/941962c9311eef365b254a2c6eea3e58/pages/view/pw-hack-demo)
+- **Workers:** [https://dash.cloudflare.com/941962c9311eef365b254a2c6eea3e58/workers/services/view/pw-hack-demo-app/production](https://dash.cloudflare.com/941962c9311eef365b254a2c6eea3e58/workers/services/view/pw-hack-demo-app/production)
+
 ---
 
 ## 📚 Table of Contents
