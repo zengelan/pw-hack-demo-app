@@ -14,7 +14,9 @@ let crackingState = {
   totalTime: 0,
   dictionaryStats: null  // Store dictionary loading stats
 };
-let submissions = [];
+let submissions = [];  // All submissions
+let allSpaces = [];    // All available spaces
+let currentSpace = null;  // Currently selected space
 let progressInterval = null;
 
 // Type badge mapping (no emojis)
@@ -29,8 +31,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize password spaces
   await PasswordSpaces.init();
   
-  loadSubmissions();
+  // Load spaces first, then submissions
+  await loadSpaces();
+  
   initControlCenter();
+  
+  // Wire up space filter
+  const spaceSelect = document.getElementById('space-filter-select');
+  if (spaceSelect) {
+    spaceSelect.addEventListener('change', () => {
+      currentSpace = spaceSelect.value;
+      localStorage.setItem('selectedSpace', currentSpace);
+      loadSubmissions();
+    });
+  }
   
   // Wire up poll interval dropdown
   const pollSelect = document.getElementById('poll-interval-select');
@@ -69,6 +83,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
 });
 
+// --- Load spaces and populate dropdown ---
+async function loadSpaces() {
+  try {
+    const res = await fetch('/api/spaces');
+    if (!res.ok) {
+      console.error('Failed to load spaces');
+      return;
+    }
+    allSpaces = await res.json();
+    
+    const spaceSelect = document.getElementById('space-filter-select');
+    if (!spaceSelect) return;
+    
+    // Clear existing options except placeholder
+    spaceSelect.innerHTML = '<option value="" disabled>Select a space...</option>';
+    
+    if (allSpaces.length === 0) {
+      spaceSelect.innerHTML = '<option value="" disabled selected>No spaces available</option>';
+      return;
+    }
+    
+    // Populate dropdown
+    allSpaces.forEach(space => {
+      const option = document.createElement('option');
+      option.value = space.id;
+      option.textContent = `${space.name} (${space.id})`;
+      spaceSelect.appendChild(option);
+    });
+    
+    // Auto-select if only one space or restore from localStorage
+    const savedSpace = localStorage.getItem('selectedSpace');
+    if (allSpaces.length === 1) {
+      currentSpace = allSpaces[0].id;
+      spaceSelect.value = currentSpace;
+    } else if (savedSpace && allSpaces.find(s => s.id === savedSpace)) {
+      currentSpace = savedSpace;
+      spaceSelect.value = currentSpace;
+    }
+    
+    // Load submissions if space is selected
+    if (currentSpace) {
+      await loadSubmissions();
+    }
+    
+  } catch (e) {
+    console.error('Error loading spaces:', e);
+  }
+}
+
+// --- Get filtered submissions for current space ---
+function getFilteredSubmissions() {
+  if (!currentSpace) return [];
+  return submissions.filter(s => s.spaceId === currentSpace);
+}
+
 // --- Initialize Control Center ---
 function initControlCenter() {
   // Detect worker count
@@ -89,6 +158,8 @@ function populateTypeFilters() {
   const container = document.getElementById('type-filter-checkboxes');
   if (!container) return;
   
+  const filteredSubs = getFilteredSubmissions();
+  
   const types = [
     { id: 'birthday_ddmmyyyy', defaultChecked: true },  // Only birthday checked by default
     { id: 'digits8', defaultChecked: false },           // Too large for browser
@@ -98,7 +169,7 @@ function populateTypeFilters() {
   
   types.forEach(type => {
     const badge = TYPE_BADGES[type.id];
-    const count = submissions.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
+    const count = filteredSubs.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
@@ -148,8 +219,12 @@ async function loadSubmissions() {
     if (!res.ok) return;
     const data = await res.json();
     submissions = Array.isArray(data) ? data : [];
-    renderTable(submissions);
-    document.getElementById('sub-count').textContent = submissions.length;
+    
+    // Filter by current space and render
+    const filteredSubs = getFilteredSubmissions();
+    renderTable(filteredSubs);
+    
+    document.getElementById('sub-count').textContent = filteredSubs.length;
     populateTypeFilters();
     updateSummary();
   } catch (e) {
@@ -254,10 +329,17 @@ function showMeta(sub) {
 function renderTable(subs) {
   const tbody = document.getElementById('submissions-tbody');
   tbody.innerHTML = '';
-  if (subs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#666">No submissions yet. Waiting...</td></tr>';
+  
+  if (!currentSpace) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#666">Select a space to view submissions...</td></tr>';
     return;
   }
+  
+  if (subs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#666">No submissions for this space yet.</td></tr>';
+    return;
+  }
+  
   subs.forEach((s, i) => {
     const cracked = s.cracked && s.password;
     const dur = cracked ? formatCrackDuration(s) : '';
@@ -349,8 +431,9 @@ function updateMetrics(metrics) {
 
 // --- Update summary ---
 function updateSummary() {
-  const total = submissions.length;
-  const cracked = submissions.filter(s => s.cracked).length;
+  const filteredSubs = getFilteredSubmissions();
+  const total = filteredSubs.length;
+  const cracked = filteredSubs.filter(s => s.cracked).length;
   const remaining = total - cracked;
   const percentage = total > 0 ? ((cracked / total) * 100).toFixed(0) : 0;
   
@@ -375,6 +458,11 @@ async function startCracking() {
     return;
   }
   
+  if (!currentSpace) {
+    alert('Please select a space first.');
+    return;
+  }
+  
   // Get selected types
   const selectedTypes = Array.from(
     document.querySelectorAll('#type-filter-checkboxes input[type="checkbox"]:checked')
@@ -390,8 +478,8 @@ async function startCracking() {
   const truncationMode = document.getElementById('opt-truncation').value;
   const priorityOrder = document.getElementById('opt-priority').value;
   
-  // Filter submissions
-  let targets = submissions.filter(s => 
+  // Filter submissions by current space AND selected types
+  let targets = getFilteredSubmissions().filter(s => 
     !s.cracked && selectedTypes.includes(s.passwordTypeId)
   );
   
@@ -410,7 +498,7 @@ async function startCracking() {
   }
   
   if (targets.length === 0) {
-    alert('No hashes to crack with selected filters.');
+    alert('No hashes to crack with selected filters in current space.');
     return;
   }
   
@@ -676,17 +764,23 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // --- Download GPU script ---
 async function downloadGPUScript() {
+  if (!currentSpace) {
+    alert('Please select a space first.');
+    return;
+  }
+  
   // Get selected types
   const selectedTypes = Array.from(
     document.querySelectorAll('#type-filter-checkboxes input[type="checkbox"]:checked')
   ).map(cb => cb.value);
   
-  const targets = submissions.filter(s => 
+  // Filter by current space AND selected types
+  const targets = getFilteredSubmissions().filter(s => 
     !s.cracked && selectedTypes.includes(s.passwordTypeId)
   );
   
   if (targets.length === 0) {
-    alert('No hashes to export with selected filters.');
+    alert('No hashes to export with selected filters in current space.');
     return;
   }
   
@@ -702,7 +796,7 @@ async function downloadGPUScript() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'gpu-cracker.py';
+      a.download = `gpu-cracker-${currentSpace}.py`;
       a.click();
       URL.revokeObjectURL(url);
     } else {
@@ -715,8 +809,9 @@ async function downloadGPUScript() {
 
 // --- Export CSV ---
 function exportCSV() {
+  const filteredSubs = getFilteredSubmissions();
   const headers = ['ID', 'Hash', 'Type', 'Password', 'Cracked', 'Device', 'IP', 'Space', 'Submitted'];
-  const rows = submissions.map(s => [
+  const rows = filteredSubs.map(s => [
     s.id,
     s.hash,
     s.passwordTypeId || 'unknown',
@@ -733,7 +828,7 @@ function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'submissions.csv';
+  a.download = `submissions-${currentSpace || 'all'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -746,8 +841,24 @@ async function deleteSingle(id) {
 
 // --- Delete all ---
 async function deleteAll() {
-  if (!confirm('Delete ALL submissions?')) return;
-  await fetch('/api/clear', { method: 'POST' });
+  if (!currentSpace) {
+    alert('Please select a space first.');
+    return;
+  }
+  
+  const filteredSubs = getFilteredSubmissions();
+  if (filteredSubs.length === 0) {
+    alert('No submissions to delete in current space.');
+    return;
+  }
+  
+  if (!confirm(`Delete ALL ${filteredSubs.length} submissions from space "${currentSpace}"?`)) return;
+  
+  // Delete each submission in the current space
+  for (const sub of filteredSubs) {
+    await fetch('/api/hash/' + sub.id, { method: 'DELETE' });
+  }
+  
   loadSubmissions();
 }
 
@@ -788,7 +899,8 @@ async function loadSpacesAdmin() {
       if (!id) return;
       if (!confirm('Delete space "' + id + '"?')) return;
       await fetch('/api/spaces/' + id, { method: 'DELETE' });
-      loadSpacesAdmin();
+      await loadSpacesAdmin();
+      await loadSpaces();  // Reload space dropdown
     };
   } catch (e) {
     console.error('Spaces load error:', e);
@@ -818,7 +930,8 @@ async function saveSpaceFromForm() {
       document.getElementById('space-name-input').value = '';
       if (document.getElementById('space-location-input')) document.getElementById('space-location-input').value = '';
       if (document.getElementById('space-desc-input')) document.getElementById('space-desc-input').value = '';
-      loadSpacesAdmin();
+      await loadSpacesAdmin();
+      await loadSpaces();  // Reload space dropdown
     } else {
       const d = await res.json();
       if (status) { status.textContent = d.error || 'Error saving space.'; status.style.color = '#f00'; }
