@@ -218,7 +218,76 @@ tr.row-cracking {
   padding: 16px;
 }
 
-.radio-label, .checkbox-label {
+/* Custom Radio Buttons */
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 0.95rem;
+  position: relative;
+  padding-left: 28px;
+}
+
+.radio-label input[type="radio"] {
+  position: absolute;
+  left: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.radio-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: 2px solid #4fc3f7;
+  border-radius: 50%;
+  background: #0d0d22;
+  transition: all 0.2s;
+}
+
+.radio-label::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4fc3f7;
+  transition: transform 0.2s;
+}
+
+.radio-label input[type="radio"]:checked ~ span {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.radio-label input[type="radio"]:checked::before {
+  border-color: #4fc3f7;
+  background: #1a3a4a;
+}
+
+.radio-label:has(input[type="radio"]:checked)::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.radio-label:hover::before {
+  border-color: #6dd4ff;
+  box-shadow: 0 0 8px rgba(79, 195, 247, 0.3);
+}
+
+/* Checkbox Labels */
+.checkbox-label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -228,7 +297,7 @@ tr.row-cracking {
   font-size: 0.95rem;
 }
 
-.radio-label input, .checkbox-label input {
+.checkbox-label input {
   cursor: pointer;
   width: auto;
   margin: 0;
@@ -866,6 +935,16 @@ td:has(.gpu-tooltip-trigger) { overflow: visible !important; }
    22. Responsive
    ---------------------------------------------------------------- */
 @media (max-width: 768px) {
+  /* Hide less critical table columns on mobile */
+  .submissions-table th:nth-child(5),
+  .submissions-table td:nth-child(5),
+  .submissions-table th:nth-child(6),
+  .submissions-table td:nth-child(6),
+  .submissions-table th:nth-child(7),
+  .submissions-table td:nth-child(7) {
+    display: none;
+  }
+  
   .control-grid {
     grid-template-columns: 1fr;
   }
