@@ -237,6 +237,7 @@ class HashcatCracker:
         if not mask:
             print(f"  WARNING: Cannot build hashcat mask for {password_type.id}")
             print(f"  This password type requires custom implementation.")
+            print(f"  Hint: {strategy.get('gpuShaderHint', 'No hint available')}")
             return results
         
         print(f"  Mask: {mask}")
@@ -294,13 +295,17 @@ class HashcatCracker:
         return results
     
     def _build_hashcat_mask(self, password_type: PasswordTypeStrategy) -> Optional[str]:
-        """Build hashcat mask from password type"""
+        """Build hashcat mask from password type - FIXED TYPE IDs"""
         type_id = password_type.id
         length = password_type.length
         
-        if type_id == 'birthday_ddmmyyyy':
-            # Hashcat doesn't support calendar validation, use mask for all 8 digits
-            # Note: This will include invalid dates, but it's the closest approximation
+        # FIXED: Correct type ID matching
+        if type_id == 'birthday':  # Was: 'birthday_ddmmyyyy'
+            # Note: Hashcat doesn't support calendar validation
+            # This will try all 8-digit combinations (100M) not just valid dates (36.5k)
+            # For optimal performance, use custom calendar generator
+            print("  ⚠️  WARNING: Birthday type uses full 8-digit space (100M attempts)")
+            print("  ⚠️  For 276x speedup, implement custom calendar iterator (see strategy.gpuShaderHint)")
             return '?d' * length
         
         elif type_id == 'digits8':
@@ -309,7 +314,12 @@ class HashcatCracker:
         elif type_id == 'lowercase8':
             return '?l' * length
         
-        # Add more types as needed
+        # FIXED: Add alphanumeric8 support
+        elif type_id == 'alphanumeric8':
+            # Define custom charset: lowercase + uppercase + digits
+            # Hashcat custom charset: -1 ?l?u?d means charset 1 = a-z, A-Z, 0-9
+            return '?1?1?1?1?1?1?1?1 -1 ?l?u?d'
+        
         return None
 
 # ============================================================================
