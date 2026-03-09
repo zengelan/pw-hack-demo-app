@@ -11,37 +11,37 @@ const PASSWORD_TYPES = [
   {
     id: "birthday_ddmmyyyy",
     label: "Birthday (DDMMYYYY)",
-    description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1920–2026.",
+    description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1927–2026 (last 100 years).",
     format: "DDMMYYYY",
     charSpace: "digits 0-9, constrained to plausible calendar dates",
     charSpaceSize: 10,
     length: 8,
     regex: "^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-6])$",
-    regexExplained: "DD = 01-31, MM = 01-12, YYYY = 1920-2026",
-    possibleValues: 38797,
-    possibleValuesNote: "Approx. 365.25 days × 106 years (1920–2026), reduced for invalid day/month combos (e.g., Feb 30). This includes birthdates of ancestors, the user, and descendants. Far smaller than a full 8-digit space.",
+    regexExplained: "DD = 01-31, MM = 01-12, YYYY = 1927-2026",
+    possibleValues: 36525,
+    possibleValuesNote: "Exactly 365.25 days × 100 years (1927–2026). Includes birthdates of ancestors, the user, and descendants. Far smaller than a full 8-digit space.",
     exampleValues: ["01011990", "24121985", "07031975", "15082020"],
-    crackingHint: "Brute-forceable in milliseconds — the year range and calendar constraints reduce the space to ~39k values.",
+    crackingHint: "Brute-forceable in milliseconds — the year range and calendar constraints reduce the space to ~36.5k values.",
     weaknessLevel: "very_high",
     
     // Brute-force strategy metadata
     bruteForceStrategy: {
       method: "calendar_iteration",
       description: "Iterate all valid calendar dates in DDMMYYYY format",
-      estimatedAttempts: 38797,
-      estimatedTimeMs: 40,
+      estimatedAttempts: 36525,
+      estimatedTimeMs: 36,
       estimatedTimeGpuMs: 2,
       order: "descending_year",
       
       parameters: {
-        yearStart: 2020,
-        yearEnd: 1940,
+        yearStart: 2026,
+        yearEnd: 1927,
         direction: "backward"
       },
       
       generatorType: "calendar",
       generatorConfig: {
-        yearRange: [1940, 2020],
+        yearRange: [1927, 2026],
         orderBy: "year_desc"
       },
       
@@ -167,6 +167,65 @@ const PASSWORD_TYPES = [
       defaultTruncationMode: "first_1M",
       
       gpuShaderHint: "Use parallel base-26 counter. Each workgroup handles range. Convert counter to string. Highly parallelizable."
+    }
+  },
+  
+  {
+    id: "alphanumeric8",
+    label: "8-Char Alphanumeric (a-z, A-Z, 0-9)",
+    description: "An 8-character password using both lowercase and uppercase letters plus digits. No special characters. Examples: Admin123, Pass2024, Test1234. More secure than lowercase-only but still vulnerable without special characters.",
+    format: "aAbB12cC",
+    charSpace: "alphanumeric: a-z, A-Z, 0-9",
+    charSpaceSize: 62,
+    length: 8,
+    regex: "^[a-zA-Z0-9]{8}$",
+    regexExplained: "Exactly 8 characters, each must be a-z, A-Z, or 0-9",
+    possibleValues: 218340105584896,
+    possibleValuesNote: "62^8 ≈ 218.3 trillion. Significantly stronger than lowercase-only (208B) due to mixed case. Dictionary attacks still work for common patterns (Admin123, Password1).",
+    exampleValues: ["Admin123", "Pass2024", "Test1234", "aB3xY9z1"],
+    crackingHint: "Full brute-force takes years in browser (~6.9 years), but only hours on GPU (~2.8 hours). Common patterns (Admin123, Password1) are cracked instantly via dictionary attacks.",
+    weaknessLevel: "medium",
+    
+    bruteForceStrategy: {
+      method: "combinatorial_iteration",
+      description: "Iterate all 62^8 combinations of alphanumeric characters",
+      estimatedAttempts: 218340105584896,
+      estimatedTimeMs: 218340105584,
+      estimatedTimeGpuMs: 9924550,
+      order: "lexicographic",
+      
+      parameters: {
+        charset: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        length: 8,
+        startFrom: "aaaaaaaa"
+      },
+      
+      generatorType: "combinatorial",
+      generatorConfig: {
+        alphabet: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        length: 8,
+        orderType: "lexicographic"
+      },
+      
+      dictionarySupport: true,
+      dictionaryUrls: [
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/xato-net-10-million-passwords-1000000.txt"
+      ],
+      dictionaryFilterRegex: "^[a-zA-Z0-9]{8}$",
+      dictionaryNote: "STRONGLY RECOMMENDED: Try dictionary first. Most users pick predictable patterns (Admin123, Password1, etc.)",
+      dictionaryPriority: "high",
+      
+      truncationSupport: true,
+      truncationModes: [
+        { name: "dictionary_only", limit: 0, description: "Dictionary attack only, no brute-force" },
+        { name: "first_100M", limit: 100000000, description: "Dictionary + first 100M combinations" },
+        { name: "first_1B", limit: 1000000000, description: "Dictionary + first 1B combinations" },
+        { name: "full", limit: 218340105584896, description: "Full space (218T) - IMPRACTICAL in browser" }
+      ],
+      defaultTruncationMode: "dictionary_only",
+      
+      gpuShaderHint: "Use parallel base-62 counter. Each workgroup handles range. Convert counter to string. Highly parallelizable but still takes ~2.8 hours on RTX 4090."
     }
   }
 ];
