@@ -9,7 +9,7 @@ const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GE
 // ---------------------------------------------------------------------------
 const PASSWORD_TYPES = [
   {
-    id: "birthday_ddmmyyyy",
+    id: "birthday",
     label: "Birthday (DDMMYYYY)",
     description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1927–2026 (last 100 years).",
     format: "DDMMYYYY",

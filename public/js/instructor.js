@@ -39,20 +39,6 @@ function getApiBaseUrl() {
 
 const API_BASE = getApiBaseUrl();
 
-// Generate type badges dynamically from PasswordSpaces
-function getTypeBadge(passwordTypeId) {
-  const type = PasswordSpaces.getMetadata(passwordTypeId);
-  if (!type) return { label: passwordTypeId || '?', class: 'type-unknown' };
-  
-  // Generate CSS class from ID
-  const cssClass = 'type-' + passwordTypeId.replace(/_/g, '-');
-  
-  // Use short label from backend metadata
-  const label = type.label.split(' ')[0]; // Take first word (e.g., "Birthday" from "Birthday (DDMMYYYY)")
-  
-  return { label, class: cssClass };
-}
-
 // Get dictionary count for a password type
 function getDictionaryInfo(passwordTypeId) {
   const type = PasswordSpaces.getMetadata(passwordTypeId);
@@ -233,26 +219,28 @@ function populateTypeFilters() {
   
   container.innerHTML = '';
   
-  // Build filters dynamically from backend types
+  // Build filters dynamically from backend types - ALWAYS show all types
   availableTypes.forEach(type => {
-    const badge = getTypeBadge(type.id);
     const dictInfo = getDictionaryInfo(type.id);
     const count = filteredSubs.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
     
-    // Skip types with 0 submissions
-    if (count === 0) return;
-    
-    // Default checked for birthday types and small spaces
-    const defaultChecked = type.bruteForceStrategy?.estimatedAttempts <= 100000;
+    // Only birthday checked by default (weakest type)
+    const defaultChecked = type.id === 'birthday';
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
     label.title = dictInfo.tooltip;
+    
+    // Show count with visual indicator if 0
+    const countDisplay = count === 0 
+      ? '<span style="color:#444">[0]</span>' 
+      : `<span style="color:#666">[${count} left]</span>`;
+    
     label.innerHTML = `
       <input type="checkbox" value="${type.id}" ${defaultChecked ? 'checked' : ''}>
       <span>
-        ${badge.label} 
-        <span style="color:#666">[${count} left]</span>
+        <code style="color:#4c9aff;font-size:0.9em">${type.id}</code>
+        ${countDisplay}
         <span style="color:#888;font-size:0.85em;margin-left:4px" title="${dictInfo.tooltip}">
           📚 ${dictInfo.count === 0 ? 'None' : dictInfo.count + ' dict' + (dictInfo.count > 1 ? 's' : '')}
         </span>
@@ -260,11 +248,6 @@ function populateTypeFilters() {
     `;
     container.appendChild(label);
   });
-  
-  // If no types with submissions, show message
-  if (container.children.length === 0) {
-    container.innerHTML = '<div style="color:#888;font-size:0.9em">No uncracked hashes in selected space</div>';
-  }
 }
 
 function updateModeUI() {
@@ -654,7 +637,6 @@ function renderTable(subs) {
   subs.forEach((s, i) => {
     const cracked = s.cracked && s.password;
     const dur = cracked ? formatCrackDuration(s) : '';
-    const badge = getTypeBadge(s.passwordTypeId);
     
     const tr = document.createElement('tr');
     tr.id = 'row-' + s.id;
@@ -668,7 +650,7 @@ function renderTable(subs) {
     tr.innerHTML =
       '<td style="text-align:center;color:#666;font-size:0.85em">' + (i + 1) + '</td>' +
       '<td><code title="' + s.hash + '" style="font-size:0.8em;cursor:help;color:#aaa">' + s.hash.substring(0, 12) + '…</code></td>' +
-      '<td><span class="type-badge ' + badge.class + '">' + badge.label + '</span></td>' +
+      '<td><code style="color:#4c9aff;font-size:0.85em">' + (s.passwordTypeId || '?') + '</code></td>' +
       '<td id="crack-' + s.id + '" style="font-weight:bold;color:' + (cracked ? '#4cff80' : '#555') + '">' + crackedCell + '</td>' +
       '<td style="font-size:0.88em" class="hide-mobile">' + guessDeviceType(s.meta && s.meta.userAgent) + '</td>' +
       '<td style="font-family:monospace;font-size:0.82em;color:#aaa" class="hide-mobile">' + ((s.meta && s.meta.ip) || '—') + '</td>' +
