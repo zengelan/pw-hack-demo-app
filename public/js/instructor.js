@@ -36,6 +36,26 @@ function getTypeBadge(passwordTypeId) {
   return { label, class: cssClass };
 }
 
+// Get dictionary count for a password type
+function getDictionaryInfo(passwordTypeId) {
+  const type = PasswordSpaces.getMetadata(passwordTypeId);
+  if (!type || !type.bruteForceStrategy) return { count: 0, urls: [], tooltip: '' };
+  
+  const strategy = type.bruteForceStrategy;
+  const urls = strategy.dictionaryUrls || [];
+  const count = urls.length;
+  
+  if (count === 0 || !strategy.dictionarySupport) {
+    return { count: 0, urls: [], tooltip: 'No dictionary support' };
+  }
+  
+  // Build tooltip with dictionary list
+  const tooltip = `Uses ${count} ${count === 1 ? 'dictionary' : 'dictionaries'}:\n` + 
+                  urls.map(url => '• ' + url.split('/').pop()).join('\n');
+  
+  return { count, urls, tooltip };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await PasswordSpaces.init();
   await loadDictionary();
@@ -196,6 +216,7 @@ function populateTypeFilters() {
   // Build filters dynamically from backend types
   availableTypes.forEach(type => {
     const badge = getTypeBadge(type.id);
+    const dictInfo = getDictionaryInfo(type.id);
     const count = filteredSubs.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
     
     // Skip types with 0 submissions
@@ -206,9 +227,16 @@ function populateTypeFilters() {
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
+    label.title = dictInfo.tooltip;
     label.innerHTML = `
       <input type="checkbox" value="${type.id}" ${defaultChecked ? 'checked' : ''}>
-      <span>${badge.label} <span style="color:#666">[${count} left]</span></span>
+      <span>
+        ${badge.label} 
+        <span style="color:#666">[${count} left]</span>
+        <span style="color:#888;font-size:0.85em;margin-left:4px" title="${dictInfo.tooltip}">
+          📚 ${dictInfo.count === 0 ? 'None' : dictInfo.count + ' dict' + (dictInfo.count > 1 ? 's' : '')}
+        </span>
+      </span>
     `;
     container.appendChild(label);
   });
@@ -468,7 +496,7 @@ function formatTime(ms) {
 async function saveCrackedPassword(id, password, attempts) {
   try {
     const res = await fetch(`/api/hash/${id}`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         password: password,
