@@ -22,14 +22,19 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
-const TYPE_BADGES = {
-  'birthday_ddmmyyyy': { label: 'Birthday', class: 'type-birthday' },
-  'digits8': { label: 'Digits8', class: 'type-digits8' },
-  'lowercase8': { label: 'Lower8', class: 'type-lowercase8' },
-  'alphanumeric8': { label: 'AlphaNum8', class: 'type-alphanumeric8' },
-  'pin4': { label: 'PIN4', class: 'type-pin4' },
-  'digits6': { label: 'Digits6', class: 'type-digits6' }
-};
+// Generate type badges dynamically from PasswordSpaces
+function getTypeBadge(passwordTypeId) {
+  const type = PasswordSpaces.getMetadata(passwordTypeId);
+  if (!type) return { label: passwordTypeId || '?', class: 'type-unknown' };
+  
+  // Generate CSS class from ID
+  const cssClass = 'type-' + passwordTypeId.replace(/_/g, '-');
+  
+  // Use short label from backend metadata
+  const label = type.label.split(' ')[0]; // Take first word (e.g., "Birthday" from "Birthday (DDMMYYYY)")
+  
+  return { label, class: cssClass };
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   await PasswordSpaces.init();
@@ -178,28 +183,40 @@ function populateTypeFilters() {
   
   const filteredSubs = getFilteredSubmissions();
   
-  const types = [
-    { id: 'birthday_ddmmyyyy', defaultChecked: true },
-    { id: 'digits8', defaultChecked: false },
-    { id: 'lowercase8', defaultChecked: false },
-    { id: 'alphanumeric8', defaultChecked: false },
-    { id: 'pin4', defaultChecked: true },
-    { id: 'digits6', defaultChecked: false }
-  ];
+  // Get all password types from PasswordSpaces (dynamically loaded from backend)
+  const availableTypes = PasswordSpaces.types || [];
+  
+  if (availableTypes.length === 0) {
+    container.innerHTML = '<div style="color:#888;font-size:0.9em">Loading password types...</div>';
+    return;
+  }
+  
   container.innerHTML = '';
   
-  types.forEach(type => {
-    const badge = TYPE_BADGES[type.id] || { label: type.id, class: 'type-unknown' };
+  // Build filters dynamically from backend types
+  availableTypes.forEach(type => {
+    const badge = getTypeBadge(type.id);
     const count = filteredSubs.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
+    
+    // Skip types with 0 submissions
+    if (count === 0) return;
+    
+    // Default checked for birthday types and small spaces
+    const defaultChecked = type.bruteForceStrategy?.estimatedAttempts <= 100000;
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
     label.innerHTML = `
-      <input type="checkbox" value="${type.id}" ${type.defaultChecked ? 'checked' : ''}>
+      <input type="checkbox" value="${type.id}" ${defaultChecked ? 'checked' : ''}>
       <span>${badge.label} <span style="color:#666">[${count} left]</span></span>
     `;
     container.appendChild(label);
   });
+  
+  // If no types with submissions, show message
+  if (container.children.length === 0) {
+    container.innerHTML = '<div style="color:#888;font-size:0.9em">No uncracked hashes in selected space</div>';
+  }
 }
 
 function updateModeUI() {
@@ -586,7 +603,7 @@ function renderTable(subs) {
   subs.forEach((s, i) => {
     const cracked = s.cracked && s.password;
     const dur = cracked ? formatCrackDuration(s) : '';
-    const badge = TYPE_BADGES[s.passwordTypeId] || { label: s.passwordTypeId || '?', class: 'type-unknown' };
+    const badge = getTypeBadge(s.passwordTypeId);
     
     const tr = document.createElement('tr');
     tr.id = 'row-' + s.id;
