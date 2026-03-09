@@ -16,11 +16,11 @@ let crackingState = {
 let submissions = [];
 let progressInterval = null;
 
-// Type badge mapping
+// Type badge mapping (no emojis)
 const TYPE_BADGES = {
-  'birthday_ddmmyyyy': { emoji: '🎂', label: 'Birthday', class: 'type-birthday' },
-  'digits8': { emoji: '🔢', label: 'Digits8', class: 'type-digits8' },
-  'lowercase8': { emoji: '🔤', label: 'Lower8', class: 'type-lowercase8' }
+  'birthday_ddmmyyyy': { label: 'Birthday', class: 'type-birthday' },
+  'digits8': { label: 'Digits8', class: 'type-digits8' },
+  'lowercase8': { label: 'Lower8', class: 'type-lowercase8' }
 };
 
 // --- Init ---
@@ -88,18 +88,22 @@ function populateTypeFilters() {
   const container = document.getElementById('type-filter-checkboxes');
   if (!container) return;
   
-  const types = ['birthday_ddmmyyyy', 'digits8', 'lowercase8'];
+  const types = [
+    { id: 'birthday_ddmmyyyy', defaultChecked: true },  // Only birthday checked by default
+    { id: 'digits8', defaultChecked: false },           // Too large for browser
+    { id: 'lowercase8', defaultChecked: false }         // Way too large for browser
+  ];
   container.innerHTML = '';
   
-  types.forEach(typeId => {
-    const badge = TYPE_BADGES[typeId];
-    const count = submissions.filter(s => s.passwordTypeId === typeId && !s.cracked).length;
+  types.forEach(type => {
+    const badge = TYPE_BADGES[type.id];
+    const count = submissions.filter(s => s.passwordTypeId === type.id && !s.cracked).length;
     
     const label = document.createElement('label');
     label.className = 'checkbox-label';
     label.innerHTML = `
-      <input type="checkbox" value="${typeId}" checked>
-      <span>${badge.emoji} ${badge.label} <span style="color:#666">[${count} left]</span></span>
+      <input type="checkbox" value="${type.id}" ${type.defaultChecked ? 'checked' : ''}>
+      <span>${badge.label} <span style="color:#666">[${count} left]</span></span>
     `;
     container.appendChild(label);
   });
@@ -177,10 +181,10 @@ function formatCrackDuration(sub) {
   return (ms / 1000).toFixed(1) + 's';
 }
 
-// --- Get type badge HTML ---
+// --- Get type badge HTML (no emoji) ---
 function getTypeBadgeHTML(typeId) {
-  const badge = TYPE_BADGES[typeId] || { emoji: '❓', label: 'Unknown', class: 'type-unknown' };
-  return `<span class="type-badge ${badge.class}">${badge.emoji} ${badge.label}</span>`;
+  const badge = TYPE_BADGES[typeId] || { label: 'Unknown', class: 'type-unknown' };
+  return `<span class="type-badge ${badge.class}">${badge.label}</span>`;
 }
 
 // --- JSON syntax highlighter ---
