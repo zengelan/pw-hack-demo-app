@@ -537,17 +537,43 @@ async function hashes() {
   const now = Date.now();
   if (_hc && (now - _ht) < HASHES_CACHE_TTL) return json(_hc);
   const idx = await getIndex();
-  const rows = await Promise.all(idx.map(id => KV_HASHES.getWithMetadata(id)));
-  _hc = rows.map(r => r.value ? JSON.parse(r.value) : null).filter(Boolean);
+  const rows = await Promise.all(idx.map(id => KV_HASHES.get(id)));
+  _hc = rows.map(r => r ? JSON.parse(r) : null).filter(Boolean);
   _ht = now;
   return json(_hc);
 }
 
+// New lightweight endpoint for instructor cracking workflow
+async function crackHash(req, id) {
+  _hc = null; _ht = 0;
+  
+  if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
+  
+  const raw = await KV_HASHES.get(id);
+  if (!raw) return json({error: "Hash not found."}, 404);
+  
+  const entry = JSON.parse(raw);
+  const body = await req.json().catch(() => ({}));
+  
+  // Merge cracked data
+  const updated = {
+    ...entry,
+    cracked: true,
+    password: esc(body.password ?? ""),
+    attempts: body.attempts ?? 0,
+    crackedAt: body.crackedAt ?? Date.now()
+  };
+  
+  await KV_HASHES.put(id, JSON.stringify(updated), {expirationTtl:7200});
+  return json({success: true});
+}
+
+// Legacy endpoint - kept for backward compatibility but not used
 async function updateHash(req, id) {
   _hc = null; _ht = 0;
-  const e = await KV_HASHES.getWithMetadata(id);
-  if (!e || !e.metadata) return json({error: "Not found."}, 404);
-  const entry = JSON.parse(e.value);
+  const raw = await KV_HASHES.get(id);
+  if (!raw) return json({error: "Not found."}, 404);
+  const entry = JSON.parse(raw);
   const b = await req.json().catch(() => ({}));
   const updated = {...entry, cracked: true, password: esc(b.password ?? ""), attempts: b.attempts ?? 0, crackedAt: Date.now()};
   if (!KV_HASHES) return json({error: "Storage backend not configured."}, 503);
@@ -605,6 +631,11 @@ export default {
     const mSpace = p.match(/^\/api\/spaces\/([^/]+)$/);
     if (mSpace && req.method === "DELETE") return deleteSpace(mSpace[1]);
 
+    // New dedicated instructor endpoint for cracking
+    const mCrack = p.match(/^\/api\/crack\/([0-9a-f-]{36})$/i);
+    if (mCrack && req.method === "POST") return crackHash(req, mCrack[1]);
+
+    // Legacy endpoints (keep for backward compatibility)
     const m = p.match(/^\/api\/hash\/([0-9a-f-]{36})$/i);
     if (m) {
       if (req.method === "POST")   return updateHash(req, m[1]);

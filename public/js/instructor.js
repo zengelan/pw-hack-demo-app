@@ -515,14 +515,13 @@ function formatTime(ms) {
 
 async function saveCrackedPassword(id, password, attempts) {
   try {
-    const res = await fetch(API_BASE + `/api/hash/${id}`, {
+    const res = await fetch(API_BASE + `/api/crack/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         password: password,
-        cracked: true,
-        crackedAt: Date.now(),
-        attempts: attempts
+        attempts: attempts,
+        crackedAt: Date.now()
       })
     });
     
