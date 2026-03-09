@@ -39,7 +39,8 @@ class WorkerPool {
   async crack(targetHash, passwordType, options = {}) {
     if (!this.workers.length) this.init();
     
-    const strategy = passwordType.bruteForceStrategy;
+    // Safely access bruteForceStrategy with null checks
+    const strategy = passwordType?.bruteForceStrategy || {};
     let totalAttempts = 0;
     const startTime = Date.now();
     
@@ -103,7 +104,8 @@ class WorkerPool {
             phase: 'dictionary',
             current: data.current,
             attempts: data.attempts,
-            speed: data.speed
+            speed: data.speed,
+            total: dictionary.length
           });
         }
         
@@ -180,7 +182,8 @@ class WorkerPool {
               phase: 'brute-force',
               current: data.current,
               attempts: baseAttempts + aggregatedAttempts,
-              speed: data.speed * numWorkers // Aggregate speed
+              speed: data.speed * numWorkers, // Aggregate speed
+              total: totalSpace
             });
           }
         }
