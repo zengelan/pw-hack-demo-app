@@ -18,6 +18,7 @@ let submissions = [];  // All submissions
 let allSpaces = [];    // All available spaces
 let currentSpace = null;  // Currently selected space
 let progressInterval = null;
+let totalCores = navigator.hardwareConcurrency || 4;  // Store cores globally
 
 // Type badge mapping (no emojis)
 const TYPE_BADGES = {
@@ -140,16 +141,11 @@ function getFilteredSubmissions() {
 
 // --- Initialize Control Center ---
 function initControlCenter() {
-  // Detect worker count
-  const totalCores = navigator.hardwareConcurrency || 4;
-  document.getElementById('worker-count').textContent = '1';
-  document.getElementById('worker-count').setAttribute('data-total', totalCores);
+  // Update mode UI first
+  updateModeUI();
   
   // Populate type filters
   populateTypeFilters();
-  
-  // Update mode UI
-  updateModeUI();
   
   // Initialize status
   updateStatus('IDLE');
@@ -188,12 +184,12 @@ function updateModeUI() {
   const isSingle = mode === 'single';
   const isMulti = mode === 'multi';
   
+  // Update button visibility
   document.getElementById('btn-start-crack').style.display = isGPU ? 'none' : 'inline-block';
   document.getElementById('btn-download-gpu').style.display = isGPU ? 'inline-block' : 'none';
   
   // Update info text
   const infoEl = document.getElementById('mode-info');
-  const totalCores = document.getElementById('worker-count').getAttribute('data-total') || navigator.hardwareConcurrency || 4;
   
   if (isGPU) {
     infoEl.innerHTML = 'Export: <span>Python script</span>';
@@ -208,7 +204,7 @@ function updateModeUI() {
 function getWorkerCount() {
   const mode = document.querySelector('input[name="crack-mode"]:checked').value;
   if (mode === 'single') return 1;
-  if (mode === 'multi') return navigator.hardwareConcurrency || 4;
+  if (mode === 'multi') return totalCores;
   return 1; // Default
 }
 
