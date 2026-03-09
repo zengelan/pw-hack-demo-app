@@ -75,14 +75,18 @@
       <div class="control-panel">
         <h3>Mode Selection</h3>
         <label class="radio-label">
-          <input type="radio" name="crack-mode" value="cpu" checked>
-          <span>● CPU Multi-Core</span>
+          <input type="radio" name="crack-mode" value="single" checked>
+          <span>● CPU Single-Core</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="crack-mode" value="multi">
+          <span>○ CPU Multi-Core</span>
         </label>
         <label class="radio-label">
           <input type="radio" name="crack-mode" value="gpu">
           <span>○ GPU Export</span>
         </label>
-        <p class="mode-info" id="mode-info">Workers: <span id="worker-count">?</span> cores</p>
+        <p class="mode-info" id="mode-info">Workers: <span id="worker-count">1</span> thread</p>
       </div>
 
       <!-- Password Type Filter -->
