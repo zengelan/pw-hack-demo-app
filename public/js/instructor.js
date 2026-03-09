@@ -442,7 +442,7 @@ async function processBatch() {
       
       if (result.password) {
         console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
-        await saveCrackedPassword(submission.id, result.password, result.attempts);
+        await saveCrackedPassword(submission.id, result.password, result.attempts, result.duration);
         crackingState.crackedCount++;
       } else {
         console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
@@ -513,7 +513,7 @@ function formatTime(ms) {
   return `${hours}h ${mins}m`;
 }
 
-async function saveCrackedPassword(id, password, attempts) {
+async function saveCrackedPassword(id, password, attempts, durationMs) {
   try {
     const res = await fetch(API_BASE + `/api/crack/${id}`, {
       method: 'POST',
@@ -521,7 +521,8 @@ async function saveCrackedPassword(id, password, attempts) {
       body: JSON.stringify({
         password: password,
         attempts: attempts,
-        crackedAt: Date.now()
+        crackedAt: Date.now(),
+        crackDurationMs: durationMs
       })
     });
     
@@ -532,6 +533,7 @@ async function saveCrackedPassword(id, password, attempts) {
         sub.cracked = true;
         sub.crackedAt = Date.now();
         sub.attempts = attempts;
+        sub.crackDurationMs = durationMs;
       }
       
       const crackedCell = document.getElementById('crack-' + id);
@@ -708,10 +710,13 @@ function guessDeviceType(ua) {
 }
 
 function formatCrackDuration(sub) {
-  if (!sub.crackedAt || !sub.submitted) return '';
-  const ms = sub.crackedAt - sub.submitted;
+  if (!sub.crackDurationMs) return '';
+  const ms = sub.crackDurationMs;
   if (ms < 1000) return ms + 'ms';
-  return (ms / 1000).toFixed(1) + 's';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const minutes = Math.floor(ms / 60000);
+  const secs = ((ms % 60000) / 1000).toFixed(0);
+  return `${minutes}m ${secs}s`;
 }
 
 function showMeta(sub) {
@@ -725,6 +730,7 @@ function showMeta(sub) {
     password: sub.password || null,
     crackedAt: sub.crackedAt ? new Date(sub.crackedAt).toISOString() : null,
     attempts: sub.attempts,
+    crackDurationMs: sub.crackDurationMs || null,
     meta: sub.meta || {}
   };
   document.getElementById('meta-modal-body').innerHTML =
@@ -775,7 +781,7 @@ function exportCSV() {
     return;
   }
   
-  let csv = 'ID,Hash,Type,Password,Cracked,Submitted,CrackedAt,Attempts,SpaceId,Device,IP\n';
+  let csv = 'ID,Hash,Type,Password,Cracked,Submitted,CrackedAt,Attempts,CrackDurationMs,SpaceId,Device,IP\n';
   filteredSubs.forEach(s => {
     const device = guessDeviceType(s.meta && s.meta.userAgent).replace(/,/g, ';');
     csv += [
@@ -787,6 +793,7 @@ function exportCSV() {
       s.submitted ? new Date(s.submitted).toISOString() : '',
       s.crackedAt ? new Date(s.crackedAt).toISOString() : '',
       s.attempts || '',
+      s.crackDurationMs || '',
       s.spaceId || '',
       '"' + device + '"',
       (s.meta && s.meta.ip) || ''

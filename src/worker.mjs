@@ -511,7 +511,7 @@ async function submit(req, env) {
     spaceId: body.spaceId,
     passwordTypeId: passwordTypeId,
     submitted: Date.now(),
-    cracked: false, attempts: 0, password: null, crackedAt: null,
+    cracked: false, attempts: 0, password: null, crackedAt: null, crackDurationMs: null,
     meta: {
       ip, country: cf.country ?? "unknown", city: cf.city ?? "unknown",
       region: cf.region ?? "unknown", postalCode: cf.postalCode ?? "unknown",
@@ -555,13 +555,14 @@ async function crackHash(req, id) {
   const entry = JSON.parse(raw);
   const body = await req.json().catch(() => ({}));
   
-  // Merge cracked data
+  // Merge cracked data - crackDurationMs is actual brute-force time
   const updated = {
     ...entry,
     cracked: true,
     password: esc(body.password ?? ""),
     attempts: body.attempts ?? 0,
-    crackedAt: body.crackedAt ?? Date.now()
+    crackedAt: body.crackedAt ?? Date.now(),
+    crackDurationMs: body.crackDurationMs ?? 0
   };
   
   await KV_HASHES.put(id, JSON.stringify(updated), {expirationTtl:7200});
