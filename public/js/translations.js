@@ -74,6 +74,7 @@ const translations = {
     pwType8Special: "8-char + special chars",
     pwType12Alnum: "12-char alphanumeric",
     pwType12Special: "12-char + special chars",
+    pwType8Digit: "8-digit PIN (00000000–99999999)",
     
     // Character sets
     charSetDigits: "Digits 0–9",
@@ -87,6 +88,7 @@ const translations = {
     time10ms: "~10 ms",
     time36ms: "~36 ms",
     time1sec: "~1 second",
+    time167min: "~1.7 minutes",
     time24days: "~2.4 days",
     time95sec: "~9.5 seconds",
     time69years: "~6.9 years",
@@ -103,7 +105,7 @@ const translations = {
     takeaway1: "<strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser",
     takeaway2: "<strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)",
     takeaway3: "<strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU",
-    takeaway4: "<strong>This assumes NO salting</strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords",
+    takeaway4: "<strong>This assumes NO <a href=\"https://en.wikipedia.org/wiki/Salt_(cryptography)\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8f8;text-decoration:underline;\">salting</a></strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords",
     
     // Status messages
     statusSelectSpace: "Please select a space first.",
@@ -202,6 +204,7 @@ const translations = {
     pwType8Special: "8 Zeichen + Sonderzeichen",
     pwType12Alnum: "12 Zeichen alphanumerisch",
     pwType12Special: "12 Zeichen + Sonderzeichen",
+    pwType8Digit: "8-stellige PIN (00000000–99999999)",
     
     // Character sets
     charSetDigits: "Ziffern 0–9",
@@ -215,6 +218,7 @@ const translations = {
     time10ms: "~10 ms",
     time36ms: "~36 ms",
     time1sec: "~1 Sekunde",
+    time167min: "~1,7 Minuten",
     time24days: "~2,4 Tage",
     time95sec: "~9,5 Sekunden",
     time69years: "~6,9 Jahre",
@@ -231,7 +235,7 @@ const translations = {
     takeaway1: "<strong>Geburtsdaten sind trivial zu knacken</strong> &mdash; unter 40 Millisekunden, sogar in einem Browser",
     takeaway2: "<strong>Länge schlägt Komplexität</strong> &mdash; 12 Zeichen alphanumerisch (102M Jahre) &gt;&gt; 8 Zeichen + Sonderzeichen (193 Jahre)",
     takeaway3: "<strong>GPUs vernichten schwache Passwörter</strong> &mdash; was 6,9 Jahre im Browser dauert, fällt auf 2,8 Stunden mit einer $1.600 GPU",
-    takeaway4: "<strong>Dies setzt KEIN Salting voraus</strong> &mdash; mit ordnungsgemäßem Salting werden GPU-Angriffe selbst für schwache Passwörter unpraktisch",
+    takeaway4: "<strong>Dies setzt KEIN <a href=\"https://de.wikipedia.org/wiki/Salt_(Kryptographie)\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8f8;text-decoration:underline;\">Salting</a> voraus</strong> &mdash; mit ordnungsgemäßem Salting werden GPU-Angriffe selbst für schwache Passwörter unpraktisch",
     
     // Status messages
     statusSelectSpace: "Bitte wähle zuerst einen Raum.",

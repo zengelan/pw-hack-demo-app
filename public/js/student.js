@@ -138,14 +138,28 @@ function onPasswordTypeChange(type) {
 
   var infoEl = document.getElementById('pwtype-info');
   if (infoEl) {
+    // Map password type IDs to translation key suffixes
+    var typeKeyMap = {
+      'birthday': 'Birthday',
+      'birthday_ddmmyyyy': 'Birthday',
+      'digits8': 'Digits8',
+      'lowercase8': 'Lowercase8',
+      'alphanumeric8': 'Alphanumeric8'
+    };
+    
+    var keySuffix = typeKeyMap[type.id];
+    var description = keySuffix ? window.i18n.t('pwTypeDesc' + keySuffix) : type.description;
+    var crackingHint = keySuffix ? window.i18n.t('pwTypeCrackHint' + keySuffix) : type.crackingHint;
+    
     var examples = (type.exampleValues || []).slice(0, 3)
         .map(function(v) { return '<code>' + v + '</code>'; }).join(', ');
+    
     infoEl.innerHTML =
         '<div style="padding:11px 14px;border-left:3px solid var(--accent,#4af);' +
         'background:rgba(255,255,255,0.04);border-radius:0 6px 6px 0;font-size:0.88em;line-height:1.5;">' +
-        '<span>' + type.description + '</span>' +
+        '<span>' + description + '</span>' +
         (examples ? '<div style="margin-top:6px;opacity:0.75;">Examples: ' + examples + '</div>' : '') +
-        (type.crackingHint ? '<div style="margin-top:5px;color:#fa0;">&#x26A1; ' + type.crackingHint + '</div>' : '') +
+        (crackingHint ? '<div style="margin-top:5px;color:#fa0;">&#x26A1; ' + crackingHint + '</div>' : '') +
         '</div>';
     infoEl.style.display = 'block';
   }
@@ -182,7 +196,7 @@ function onPasswordTypeChange(type) {
     pwInput.style.borderColor = '';
     
     // Set attributes based on password type
-    if (type.id === 'birthday_ddmmyyyy') {
+    if (type.id === 'birthday_ddmmyyyy' || type.id === 'birthday') {
       // Birthday: numeric only, 8 digits
       pwInput.setAttribute('maxlength', '8');
       pwInput.setAttribute('inputmode', 'numeric');
@@ -235,7 +249,7 @@ function onPasswordTypeChange(type) {
   // Show/hide calendar button based on password type
   var calendarBtn = document.getElementById('calendar-trigger');
   if (calendarBtn) {
-    if (type.id === 'birthday_ddmmyyyy') {
+    if (type.id === 'birthday_ddmmyyyy' || type.id === 'birthday') {
       calendarBtn.classList.remove('hidden');
     } else {
       calendarBtn.classList.add('hidden');
