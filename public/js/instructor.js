@@ -350,6 +350,11 @@ async function startCracking() {
   crackingState.crackedCount = 0;
   crackingState.totalAttempts = 0;
   
+  // Start logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.startSession();
+  }
+  
   updateStatus('CRACKING');
   document.getElementById('btn-start-crack').style.display = 'none';
   document.getElementById('btn-pause-crack').style.display = 'inline-block';
@@ -379,6 +384,11 @@ async function processBatch() {
       continue;
     }
     
+    // Log hash start
+    if (typeof ProgressLogger !== 'undefined') {
+      ProgressLogger.onHashStart(submission.id, submission.hash, submission.passwordTypeId);
+    }
+    
     const useDictionary = document.getElementById('opt-dictionary')?.checked;
     const truncationMode = document.getElementById('opt-truncation')?.value || 'full';
     
@@ -394,6 +404,11 @@ async function processBatch() {
         } else {
           console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
           updateStatus('CRACKING');
+          
+          // Log dictionary phase
+          if (typeof ProgressLogger !== 'undefined') {
+            ProgressLogger.onPhaseChange('dictionary', submission.id);
+          }
         }
       } catch (e) {
         console.error('Failed to load dictionary for type:', passwordType.id, e);
@@ -405,24 +420,54 @@ async function processBatch() {
     const options = {
       dictionary: dictionary,
       truncationMode: truncationMode,
-      onProgress: updateProgress
+      onProgress: (progress) => {
+        updateProgress(progress);
+        
+        // Log progress updates
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onProgress(progress);
+          
+          // Detect phase change to brute-force
+          if (progress.phase === 'brute-force' && dictionary.length > 0) {
+            ProgressLogger.onPhaseChange('brute-force', submission.id);
+          }
+        }
+      }
     };
+    
+    const hashStartTime = Date.now();
     
     try {
       const result = await workerPool.crack(submission.hash, passwordType, options);
+      const hashDuration = Date.now() - hashStartTime;
       
       if (result.password) {
         console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
         await saveCrackedPassword(submission.id, result.password, result.attempts, result.duration);
         crackingState.crackedCount++;
+        
+        // Log successful crack
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onHashCracked(submission.id, result.password, result.attempts, hashDuration);
+        }
       } else {
         console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
+        
+        // Log failed crack
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onHashFailed(submission.id, result.attempts, hashDuration);
+        }
       }
       
       crackingState.totalAttempts += result.attempts;
       
     } catch (err) {
       console.error('Error cracking hash:', err);
+      
+      // Log error
+      if (typeof ProgressLogger !== 'undefined') {
+        ProgressLogger.logEvent('error', `Error cracking hash: ${err.message}`);
+      }
     }
     
     crackingState.batchIndex++;
@@ -524,6 +569,11 @@ function finishCracking() {
   crackingState.active = false;
   crackingState.paused = false;
   
+  // End logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.endSession('complete');
+  }
+  
   updateStatus('COMPLETE', `${crackingState.crackedCount} passwords cracked`);
   
   document.getElementById('btn-start-crack').style.display = 'inline-block';
@@ -550,6 +600,10 @@ function pauseCracking() {
   updateStatus('PAUSED');
   document.getElementById('btn-pause-crack').textContent = '▶️ RESUME';
   
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
+  }
+  
   if (workerPool) {
     workerPool.cancel();
   }
@@ -560,6 +614,10 @@ function resumeCracking() {
   updateStatus('CRACKING');
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
   
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.logEvent('info', '▶️ Cracking resumed');
+  }
+  
   processBatch();
 }
 
@@ -569,6 +627,11 @@ function stopCracking() {
   
   if (workerPool) {
     workerPool.cancel();
+  }
+  
+  // End logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.endSession('stopped by user');
   }
   
   updateStatus('IDLE', 'Stopped by user');
@@ -635,6 +698,10 @@ async function downloadGPUScript() {
     URL.revokeObjectURL(url);
     
     console.log('✅ GPU script exported successfully');
+    
+    if (typeof ProgressLogger !== 'undefined') {
+      ProgressLogger.logEvent('info', `📥 GPU script exported for ${uncracked.length} hashes`);
+    }
   } catch (e) {
     console.error('Failed to export GPU script:', e);
     alert('Network error exporting GPU script');
