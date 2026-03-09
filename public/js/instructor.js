@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-delete-all').addEventListener('click', deleteAll);
   document.getElementById('btn-refresh').addEventListener('click', loadSubmissions);
   document.getElementById('btn-start-crack').addEventListener('click', startCracking);
-  document.getElementById('btn-pause-crack').addEventListener('click', pauseCracking);
+  document.getElementById('btn-pause-crack').addEventListener('click', togglePause);
   document.getElementById('btn-stop-crack').addEventListener('click', stopCracking);
   document.getElementById('btn-download-gpu').addEventListener('click', downloadGPUScript);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
@@ -542,18 +542,27 @@ function finishCracking() {
   document.getElementById('btn-pause-crack').style.display = 'none';
   document.getElementById('btn-stop-crack').style.display = 'none';
   
+  // Reset pause button text
+  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
   document.getElementById('progress-fill').style.width = '100%';
   document.getElementById('progress-text').textContent = '100%';
   
   loadSubmissions();
 }
 
+function togglePause() {
+  if (crackingState.paused) {
+    resumeCracking();
+  } else {
+    pauseCracking();
+  }
+}
+
 function pauseCracking() {
   crackingState.paused = true;
   updateStatus('PAUSED');
   document.getElementById('btn-pause-crack').textContent = '▶️ RESUME';
-  document.getElementById('btn-pause-crack').removeEventListener('click', pauseCracking);
-  document.getElementById('btn-pause-crack').addEventListener('click', resumeCracking);
   
   if (workerPool) {
     workerPool.cancel();
@@ -564,8 +573,6 @@ function resumeCracking() {
   crackingState.paused = false;
   updateStatus('CRACKING');
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
-  document.getElementById('btn-pause-crack').removeEventListener('click', resumeCracking);
-  document.getElementById('btn-pause-crack').addEventListener('click', pauseCracking);
   
   processBatch();
 }
@@ -583,6 +590,13 @@ function stopCracking() {
   document.getElementById('btn-start-crack').style.display = 'inline-block';
   document.getElementById('btn-pause-crack').style.display = 'none';
   document.getElementById('btn-stop-crack').style.display = 'none';
+  
+  // Reset pause button text in case it was paused
+  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
+  // Reset progress bar
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-text').textContent = '0%';
   
   document.getElementById('metric-hash').textContent = '—';
   document.getElementById('metric-candidate').textContent = '—';
