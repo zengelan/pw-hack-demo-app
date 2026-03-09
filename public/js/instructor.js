@@ -13,8 +13,7 @@ let crackingState = {
   startTime: null,
   totalAttempts: 0,
   totalTime: 0,
-  crackedCount: 0,
-  dictionary: null
+  crackedCount: 0
 };
 let submissions = [];
 let allSpaces = [];
@@ -64,7 +63,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('API Base URL:', API_BASE || '(relative paths)');
   
   await PasswordSpaces.init();
-  await loadDictionary();
   await loadSpaces();
   initControlCenter();
   
@@ -109,21 +107,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const saveSpaceBtn = document.getElementById('btn-save-space');
   if (saveSpaceBtn) saveSpaceBtn.addEventListener('click', saveSpaceFromForm);
 });
-
-async function loadDictionary() {
-  if (typeof dictionaryLoader !== 'undefined') {
-    try {
-      crackingState.dictionary = await dictionaryLoader.load('/dictionaries/common-passwords.txt');
-      console.log('Dictionary loaded:', crackingState.dictionary ? crackingState.dictionary.length : 0, 'words');
-    } catch (e) {
-      console.error('Failed to load dictionary:', e);
-      crackingState.dictionary = [];
-    }
-  } else {
-    console.warn('dictionaryLoader not available');
-    crackingState.dictionary = [];
-  }
-}
 
 function startPolling(intervalMs) {
   if (pollTimer) {
@@ -411,11 +394,24 @@ async function processBatch() {
       continue;
     }
     
-    const useDictionary = document.getElementById('opt-dictionary')?.checked && crackingState.dictionary && crackingState.dictionary.length > 0;
+    const useDictionary = document.getElementById('opt-dictionary')?.checked;
     const truncationMode = document.getElementById('opt-truncation')?.value || 'full';
     
+    // Load dictionary for this specific password type
+    let dictionary = [];
+    if (useDictionary && typeof dictionaryLoader !== 'undefined') {
+      try {
+        console.log(`Loading dictionary for password type: ${passwordType.id}`);
+        dictionary = await dictionaryLoader.loadForType(passwordType);
+        console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
+      } catch (e) {
+        console.error('Failed to load dictionary for type:', passwordType.id, e);
+        dictionary = [];
+      }
+    }
+    
     const options = {
-      dictionary: useDictionary ? crackingState.dictionary : [],
+      dictionary: dictionary,
       truncationMode: truncationMode,
       onProgress: updateProgress
     };
