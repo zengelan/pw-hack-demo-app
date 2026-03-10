@@ -306,6 +306,9 @@ function updatePageLanguage() {
   // Update Step 2 - Password Type
   updateElement('[data-i18n="pwTypeTitle"]', t('pwTypeTitle'));
   updateElement('[data-i18n="pwTypeDescription"]', t('pwTypeDescription'));
+  updateElement('[data-i18n="pwTypeWhyMatters"]', t('pwTypeWhyMatters'));
+  updateElement('[data-i18n="pwTypeWhyMattersText"]', t('pwTypeWhyMattersText'));
+  updateElement('[data-i18n="pwTypeCrackerWorks"]', t('pwTypeCrackerWorks'));
   
   // Update Step 3
   updateElement('[data-i18n="step3Title"]', t('step3Title'));
