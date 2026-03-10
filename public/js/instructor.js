@@ -21,6 +21,21 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
+// --- Throttled UI state for Candidate / Speed / Estimated (max once per 3s) ---
+const STATS_UI_UPDATE_MS = 3000;
+let lastStatsUiUpdateAt = 0;
+let latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+
+function flushThrottledStatsUi(force = false) {
+  const now = Date.now();
+  if (!force && now - lastStatsUiUpdateAt < STATS_UI_UPDATE_MS) return;
+  document.getElementById('metric-candidate').textContent = latestStatsUi.candidate;
+  document.getElementById('metric-speed').textContent     = latestStatsUi.speed;
+  document.getElementById('metric-estimated').textContent = latestStatsUi.estimated;
+  lastStatsUiUpdateAt = now;
+}
+// ---------------------------------------------------------------------------
+
 // API Base URL detection
 function getApiBaseUrl() {
   const hostname = window.location.hostname;
@@ -350,6 +365,16 @@ async function startCracking() {
   crackingState.crackedCount = 0;
   crackingState.totalAttempts = 0;
   
+  // Reset throttle state and force-clear the 3 fields
+  lastStatsUiUpdateAt = 0;
+  latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+  flushThrottledStatsUi(true);
+  
+  // Start logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.startSession();
+  }
+  
   updateStatus('CRACKING');
   document.getElementById('btn-start-crack').style.display = 'none';
   document.getElementById('btn-pause-crack').style.display = 'inline-block';
@@ -379,6 +404,11 @@ async function processBatch() {
       continue;
     }
     
+    // Log hash start
+    if (typeof ProgressLogger !== 'undefined') {
+      ProgressLogger.onHashStart(submission.id, submission.hash, submission.passwordTypeId);
+    }
+    
     const useDictionary = document.getElementById('opt-dictionary')?.checked;
     const truncationMode = document.getElementById('opt-truncation')?.value || 'full';
     
@@ -394,6 +424,11 @@ async function processBatch() {
         } else {
           console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
           updateStatus('CRACKING');
+          
+          // Log dictionary phase
+          if (typeof ProgressLogger !== 'undefined') {
+            ProgressLogger.onPhaseChange('dictionary', submission.id);
+          }
         }
       } catch (e) {
         console.error('Failed to load dictionary for type:', passwordType.id, e);
@@ -405,24 +440,54 @@ async function processBatch() {
     const options = {
       dictionary: dictionary,
       truncationMode: truncationMode,
-      onProgress: updateProgress
+      onProgress: (progress) => {
+        updateProgress(progress);
+        
+        // Log progress updates
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onProgress(progress);
+          
+          // Detect phase change to brute-force
+          if (progress.phase === 'brute-force' && dictionary.length > 0) {
+            ProgressLogger.onPhaseChange('brute-force', submission.id);
+          }
+        }
+      }
     };
+    
+    const hashStartTime = Date.now();
     
     try {
       const result = await workerPool.crack(submission.hash, passwordType, options);
+      const hashDuration = Date.now() - hashStartTime;
       
       if (result.password) {
         console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
         await saveCrackedPassword(submission.id, result.password, result.attempts, result.duration);
         crackingState.crackedCount++;
+        
+        // Log successful crack
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onHashCracked(submission.id, result.password, result.attempts, hashDuration);
+        }
       } else {
         console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
+        
+        // Log failed crack
+        if (typeof ProgressLogger !== 'undefined') {
+          ProgressLogger.onHashFailed(submission.id, result.attempts, hashDuration);
+        }
       }
       
       crackingState.totalAttempts += result.attempts;
       
     } catch (err) {
       console.error('Error cracking hash:', err);
+      
+      // Log error
+      if (typeof ProgressLogger !== 'undefined') {
+        ProgressLogger.logEvent('error', `Error cracking hash: ${err.message}`);
+      }
     }
     
     crackingState.batchIndex++;
@@ -435,29 +500,39 @@ async function processBatch() {
 }
 
 function updateProgress(progress) {
-  document.getElementById('metric-candidate').textContent = progress.current || '—';
-  document.getElementById('metric-speed').textContent = formatSpeed(progress.speed || 0);
-  document.getElementById('metric-attempts').textContent = `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
-  
+  // Buffer the 3 volatile fields — they are flushed to DOM at most once per 3s
+  latestStatsUi.candidate = progress.current || '—';
+  latestStatsUi.speed     = formatSpeed(progress.speed || 0);
+
+  // Attempts, elapsed and progress bar update every call (low flicker, needed for accuracy)
+  document.getElementById('metric-attempts').textContent =
+    `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
+
   if (crackingState.startTime) {
     const elapsed = Date.now() - crackingState.startTime;
     document.getElementById('metric-elapsed').textContent = formatTime(elapsed);
   }
-  
+
   if (progress.total && progress.attempts) {
     const percent = Math.min(100, (progress.attempts / progress.total) * 100);
     document.getElementById('progress-fill').style.width = percent + '%';
     document.getElementById('progress-text').textContent = Math.round(percent) + '%';
-    
+
     if (progress.speed > 0 && progress.total > progress.attempts) {
       const remaining = progress.total - progress.attempts;
       const eta = Math.ceil(remaining / progress.speed) * 1000;
-      document.getElementById('metric-estimated').textContent = formatTime(eta);
+      latestStatsUi.estimated = formatTime(eta);
+    } else {
+      latestStatsUi.estimated = '—';
     }
   }
-  
+
   const phaseText = progress.phase === 'dictionary' ? 'Dictionary attack' : 'Brute-force';
-  document.getElementById('metric-phase').textContent = `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+  document.getElementById('metric-phase').textContent =
+    `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+
+  // Flush candidate/speed/estimated at most once per 3 seconds
+  flushThrottledStatsUi(false);
 }
 
 function formatSpeed(speed) {
@@ -524,6 +599,11 @@ function finishCracking() {
   crackingState.active = false;
   crackingState.paused = false;
   
+  // End logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.endSession('complete');
+  }
+  
   updateStatus('COMPLETE', `${crackingState.crackedCount} passwords cracked`);
   
   document.getElementById('btn-start-crack').style.display = 'inline-block';
@@ -533,6 +613,9 @@ function finishCracking() {
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
   document.getElementById('progress-fill').style.width = '100%';
   document.getElementById('progress-text').textContent = '100%';
+
+  // Force-flush final stats values
+  flushThrottledStatsUi(true);
   
   loadSubmissions();
 }
@@ -550,6 +633,10 @@ function pauseCracking() {
   updateStatus('PAUSED');
   document.getElementById('btn-pause-crack').textContent = '▶️ RESUME';
   
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
+  }
+  
   if (workerPool) {
     workerPool.cancel();
   }
@@ -559,6 +646,10 @@ function resumeCracking() {
   crackingState.paused = false;
   updateStatus('CRACKING');
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.logEvent('info', '▶️ Cracking resumed');
+  }
   
   processBatch();
 }
@@ -571,6 +662,11 @@ function stopCracking() {
     workerPool.cancel();
   }
   
+  // End logger session
+  if (typeof ProgressLogger !== 'undefined') {
+    ProgressLogger.endSession('stopped by user');
+  }
+  
   updateStatus('IDLE', 'Stopped by user');
   
   document.getElementById('btn-start-crack').style.display = 'inline-block';
@@ -581,11 +677,13 @@ function stopCracking() {
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-text').textContent = '0%';
   document.getElementById('metric-hash').textContent = '—';
-  document.getElementById('metric-candidate').textContent = '—';
-  document.getElementById('metric-speed').textContent = '0 H/s';
   document.getElementById('metric-attempts').textContent = '0 / 0';
-  document.getElementById('metric-estimated').textContent = '—';
+  document.getElementById('metric-elapsed').textContent = '00:00';
   document.getElementById('metric-phase').textContent = 'Stopped';
+
+  // Force-clear the throttled fields immediately
+  latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+  flushThrottledStatsUi(true);
   
   loadSubmissions();
 }
@@ -635,6 +733,10 @@ async function downloadGPUScript() {
     URL.revokeObjectURL(url);
     
     console.log('✅ GPU script exported successfully');
+    
+    if (typeof ProgressLogger !== 'undefined') {
+      ProgressLogger.logEvent('info', `📥 GPU script exported for ${uncracked.length} hashes`);
+    }
   } catch (e) {
     console.error('Failed to export GPU script:', e);
     alert('Network error exporting GPU script');

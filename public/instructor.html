@@ -5,6 +5,227 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Instructor Dashboard - Password Hack Demo</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Enhanced Progress Display Styles */
+    .progress-details {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    
+    .event-log-panel {
+      background: #0d1117;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.85em;
+    }
+    
+    .event-log-panel h4 {
+      margin: 0 0 12px 0;
+      color: #4fc3f7;
+      font-size: 1em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .event-log {
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    
+    .log-entry {
+      padding: 6px 8px;
+      border-left: 3px solid #333;
+      margin-bottom: 4px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 3px;
+      line-height: 1.5;
+    }
+    
+    .log-entry.success { border-left-color: #4cff80; }
+    .log-entry.error { border-left-color: #ff4444; }
+    .log-entry.info { border-left-color: #4fc3f7; }
+    .log-entry.warning { border-left-color: #ffaa00; }
+    
+    .log-timestamp {
+      color: #666;
+      font-size: 0.85em;
+      margin-right: 8px;
+    }
+    
+    .log-message {
+      color: #ddd;
+    }
+    
+    .log-message code {
+      background: rgba(76,201,255,0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #4fc3f7;
+    }
+    
+    .hash-results-panel {
+      background: #0d1117;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .hash-results-panel h4 {
+      margin: 0 0 12px 0;
+      color: #4fc3f7;
+      font-size: 1em;
+    }
+    
+    .hash-result-item {
+      padding: 8px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #333;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 0.85em;
+    }
+    
+    .hash-result-item.cracked {
+      border-color: #4cff80;
+      background: rgba(76, 255, 128, 0.05);
+    }
+    
+    .hash-result-item.failed {
+      border-color: #666;
+      background: rgba(255, 255, 255, 0.01);
+    }
+    
+    .hash-result-item.processing {
+      border-color: #4fc3f7;
+      background: rgba(79, 195, 247, 0.05);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .hash-result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    
+    .hash-result-hash {
+      font-family: monospace;
+      color: #aaa;
+      font-size: 0.9em;
+    }
+    
+    .hash-result-status {
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+    
+    .hash-result-status.cracked {
+      background: rgba(76, 255, 128, 0.2);
+      color: #4cff80;
+    }
+    
+    .hash-result-status.failed {
+      background: rgba(255, 68, 68, 0.2);
+      color: #ff4444;
+    }
+    
+    .hash-result-status.processing {
+      background: rgba(79, 195, 247, 0.2);
+      color: #4fc3f7;
+    }
+    
+    .hash-result-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #333;
+      color: #999;
+      font-size: 0.9em;
+    }
+    
+    .hash-result-detail {
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .hash-result-detail strong {
+      color: #ddd;
+    }
+    
+    .performance-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+      padding: 16px;
+      background: rgba(79, 195, 247, 0.05);
+      border: 1px solid rgba(79, 195, 247, 0.2);
+      border-radius: 8px;
+    }
+    
+    .perf-metric {
+      text-align: center;
+    }
+    
+    .perf-metric-value {
+      font-size: 1.5em;
+      font-weight: 700;
+      color: #4fc3f7;
+      display: block;
+    }
+    
+    .perf-metric-label {
+      font-size: 0.85em;
+      color: #999;
+      margin-top: 4px;
+      display: block;
+    }
+    
+    .log-controls {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .log-btn {
+      background: #333;
+      border: 1px solid #555;
+      color: #ddd;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: all 0.2s;
+    }
+    
+    .log-btn:hover {
+      background: #444;
+      border-color: #666;
+    }
+    
+    @media (max-width: 1200px) {
+      .progress-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -149,6 +370,23 @@
         </div>
         <span class="progress-text" id="progress-text">0%</span>
       </div>
+      
+      <!-- Performance Metrics -->
+      <div class="performance-metrics">
+        <div class="perf-metric">
+          <span class="perf-metric-value" id="perf-success-rate">0%</span>
+          <span class="perf-metric-label">Success Rate</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-value" id="perf-avg-speed">0 H/s</span>
+          <span class="perf-metric-label">Avg Speed</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-value" id="perf-total-attempts">0</span>
+          <span class="perf-metric-label">Total Attempts</span>
+        </div>
+      </div>
+      
       <div class="metrics-grid">
         <div class="metric">
           <span class="metric-label">Current Hash:</span>
@@ -206,6 +444,34 @@
       <div class="summary-item">
         <span class="summary-label">Total Time:</span>
         <span class="summary-value" id="summary-time">00:00:00</span>
+      </div>
+    </div>
+    
+    <!-- Enhanced Progress Details -->
+    <div class="progress-details" id="progress-details" style="display:none">
+      <!-- Event Log -->
+      <div class="event-log-panel">
+        <h4>
+          <span>📜 Event Log</span>
+          <div class="log-controls">
+            <button class="log-btn" id="btn-clear-log" title="Clear log">Clear</button>
+            <button class="log-btn" id="btn-export-log" title="Export log">Export</button>
+          </div>
+        </h4>
+        <div class="event-log" id="event-log">
+          <div class="log-entry info">
+            <span class="log-timestamp">--:--:--</span>
+            <span class="log-message">Waiting to start...</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Hash Results -->
+      <div class="hash-results-panel">
+        <h4>🎯 Hash Results</h4>
+        <div id="hash-results">
+          <p style="color:#666;text-align:center;margin:20px 0">No hashes being processed</p>
+        </div>
       </div>
     </div>
   </div>
@@ -291,6 +557,7 @@
 <script src="js/dictionary-loader.js"></script>
 <script src="js/worker-pool.js"></script>
 <script src="js/instructor.js"></script>
+<script src="js/progress-logger.js"></script>
 <script>
   const APP_URL = "https://pw-hack-demo.apps.zengel.cloud";
 
