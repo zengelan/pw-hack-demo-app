@@ -21,6 +21,21 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
+// --- Throttled UI state for Candidate / Speed / Estimated (max once per 3s) ---
+const STATS_UI_UPDATE_MS = 3000;
+let lastStatsUiUpdateAt = 0;
+let latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+
+function flushThrottledStatsUi(force = false) {
+  const now = Date.now();
+  if (!force && now - lastStatsUiUpdateAt < STATS_UI_UPDATE_MS) return;
+  document.getElementById('metric-candidate').textContent = latestStatsUi.candidate;
+  document.getElementById('metric-speed').textContent     = latestStatsUi.speed;
+  document.getElementById('metric-estimated').textContent = latestStatsUi.estimated;
+  lastStatsUiUpdateAt = now;
+}
+// ---------------------------------------------------------------------------
+
 // API Base URL detection
 function getApiBaseUrl() {
   const hostname = window.location.hostname;
@@ -350,6 +365,11 @@ async function startCracking() {
   crackingState.crackedCount = 0;
   crackingState.totalAttempts = 0;
   
+  // Reset throttle state and force-clear the 3 fields
+  lastStatsUiUpdateAt = 0;
+  latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+  flushThrottledStatsUi(true);
+  
   // Start logger session
   if (typeof ProgressLogger !== 'undefined') {
     ProgressLogger.startSession();
@@ -480,29 +500,39 @@ async function processBatch() {
 }
 
 function updateProgress(progress) {
-  document.getElementById('metric-candidate').textContent = progress.current || '—';
-  document.getElementById('metric-speed').textContent = formatSpeed(progress.speed || 0);
-  document.getElementById('metric-attempts').textContent = `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
-  
+  // Buffer the 3 volatile fields — they are flushed to DOM at most once per 3s
+  latestStatsUi.candidate = progress.current || '—';
+  latestStatsUi.speed     = formatSpeed(progress.speed || 0);
+
+  // Attempts, elapsed and progress bar update every call (low flicker, needed for accuracy)
+  document.getElementById('metric-attempts').textContent =
+    `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
+
   if (crackingState.startTime) {
     const elapsed = Date.now() - crackingState.startTime;
     document.getElementById('metric-elapsed').textContent = formatTime(elapsed);
   }
-  
+
   if (progress.total && progress.attempts) {
     const percent = Math.min(100, (progress.attempts / progress.total) * 100);
     document.getElementById('progress-fill').style.width = percent + '%';
     document.getElementById('progress-text').textContent = Math.round(percent) + '%';
-    
+
     if (progress.speed > 0 && progress.total > progress.attempts) {
       const remaining = progress.total - progress.attempts;
       const eta = Math.ceil(remaining / progress.speed) * 1000;
-      document.getElementById('metric-estimated').textContent = formatTime(eta);
+      latestStatsUi.estimated = formatTime(eta);
+    } else {
+      latestStatsUi.estimated = '—';
     }
   }
-  
+
   const phaseText = progress.phase === 'dictionary' ? 'Dictionary attack' : 'Brute-force';
-  document.getElementById('metric-phase').textContent = `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+  document.getElementById('metric-phase').textContent =
+    `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+
+  // Flush candidate/speed/estimated at most once per 3 seconds
+  flushThrottledStatsUi(false);
 }
 
 function formatSpeed(speed) {
@@ -583,6 +613,9 @@ function finishCracking() {
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
   document.getElementById('progress-fill').style.width = '100%';
   document.getElementById('progress-text').textContent = '100%';
+
+  // Force-flush final stats values
+  flushThrottledStatsUi(true);
   
   loadSubmissions();
 }
@@ -644,11 +677,13 @@ function stopCracking() {
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-text').textContent = '0%';
   document.getElementById('metric-hash').textContent = '—';
-  document.getElementById('metric-candidate').textContent = '—';
-  document.getElementById('metric-speed').textContent = '0 H/s';
   document.getElementById('metric-attempts').textContent = '0 / 0';
-  document.getElementById('metric-estimated').textContent = '—';
+  document.getElementById('metric-elapsed').textContent = '00:00';
   document.getElementById('metric-phase').textContent = 'Stopped';
+
+  // Force-clear the throttled fields immediately
+  latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
+  flushThrottledStatsUi(true);
   
   loadSubmissions();
 }
