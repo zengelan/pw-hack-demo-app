@@ -35,6 +35,21 @@
       box-shadow: 0 0 0 2px rgba(136, 255, 136, 0.2);
     }
 
+    /* Mobile: language selector stacks above header, no overlap */
+    @media (max-width: 600px) {
+      .language-selector {
+        position: relative;
+        top: auto;
+        right: auto;
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px 16px 0;
+      }
+      .app-header {
+        padding-top: 4px;
+      }
+    }
+
     .input-row {
       display: flex;
       align-items: stretch;
