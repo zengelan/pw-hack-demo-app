@@ -6,14 +6,14 @@
 export const PASSWORD_TYPES_I18N = {
   birthday: {
     en: {
-      description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1927–2026 (last 100 years).",
+      description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1920–2050 (131 years, ~47,848 valid dates).",
       exampleNote: "Examples: 01011990, 24121985, 07031975, 15082020",
-      crackingHint: "⚡ ~36,500 combinations — crackable in milliseconds. The year range and calendar constraints reduce the space dramatically."
+      crackingHint: "⚡ ~47,800 combinations — crackable in milliseconds. The year range (1920–2050) and calendar constraints reduce the space dramatically."
     },
     de: {
-      description: "Ein 8-stelliges Passwort, abgeleitet von einem Geburtsdatum im Format TTMMJJJJ (z.B. 15081990 für 15. Aug. 1990). Sehr häufige Wahl, da leicht zu merken. Personen verwenden oft ihr eigenes Geburtsdatum, das eines Familienmitglieds oder sogar eines Nachkommens (Kind/Enkelkind). Nur plausible Kalenderdaten sind gültig: Tage 01–31, Monate 01–12, Jahre 1927–2026 (letzte 100 Jahre).",
+      description: "Ein 8-stelliges Passwort, abgeleitet von einem Geburtsdatum im Format TTMMJJJJ (z.B. 15081990 für 15. Aug. 1990). Sehr häufige Wahl, da leicht zu merken. Personen verwenden oft ihr eigenes Geburtsdatum, das eines Familienmitglieds oder sogar eines Nachkommens (Kind/Enkelkind). Nur plausible Kalenderdaten sind gültig: Tage 01–31, Monate 01–12, Jahre 1920–2050 (131 Jahre, ~47.800 gültige Daten).",
       exampleNote: "Beispiele: 01011990, 24121985, 07031975, 15082020",
-      crackingHint: "⚡ ~36.500 Kombinationen — in Millisekunden knackbar. Der Jahresbereich und die Kalenderbeschränkungen reduzieren den Suchraum drastisch."
+      crackingHint: "⚡ ~47.800 Kombinationen — in Millisekunden knackbar. Der Jahresbereich (1920–2050) und die Kalenderbeschränkungen reduzieren den Suchraum drastisch."
     }
   },
   

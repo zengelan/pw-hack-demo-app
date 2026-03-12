@@ -11,37 +11,37 @@ const PASSWORD_TYPES = [
   {
     id: "birthday",
     label: "Birthday (DDMMYYYY)",
-    description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1927–2026 (last 100 years).",
+    description: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990 for 15 Aug 1990). Very common choice because it is easy to remember. People may use their own birthday, a family member's, or even a descendant's (child/grandchild). Only plausible calendar dates are valid: days 01–31, months 01–12, years 1920–2050 (131 years).",
     format: "DDMMYYYY",
     charSpace: "digits 0-9, constrained to plausible calendar dates",
     charSpaceSize: 10,
     length: 8,
-    regex: "^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|20[0-2][0-6])$",
-    regexExplained: "DD = 01-31, MM = 01-12, YYYY = 1927-2026",
-    possibleValues: 36525,
-    possibleValuesNote: "Exactly 365.25 days × 100 years (1927–2026). Includes birthdates of ancestors, the user, and descendants. Far smaller than a full 8-digit space.",
+    regex: "^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19[2-9][0-9]|200[0-9]|201[0-9]|202[0-9]|203[0-9]|204[0-9]|2050)$",
+    regexExplained: "DD = 01-31, MM = 01-12, YYYY = 1920-2050",
+    possibleValues: 47848,
+    possibleValuesNote: "47,848 valid calendar dates (1920–2050, 131 years). Includes birthdates of ancestors, the user, and descendants. Far smaller than a full 8-digit space.",
     exampleValues: ["01011990", "24121985", "07031975", "15082020"],
-    crackingHint: "Brute-forceable in milliseconds — the year range and calendar constraints reduce the space to ~36.5k values.",
+    crackingHint: "Brute-forceable in milliseconds — the year range and calendar constraints reduce the space to ~47.8k values.",
     weaknessLevel: "very_high",
     
     // Brute-force strategy metadata
     bruteForceStrategy: {
       method: "calendar_iteration",
       description: "Iterate all valid calendar dates in DDMMYYYY format",
-      estimatedAttempts: 36525,
-      estimatedTimeMs: 36,
+      estimatedAttempts: 47848,
+      estimatedTimeMs: 48,
       estimatedTimeGpuMs: 2,
       order: "descending_year",
       
       parameters: {
-        yearStart: 2026,
-        yearEnd: 1927,
+        yearStart: 2050,
+        yearEnd: 1920,
         direction: "backward"
       },
       
       generatorType: "calendar",
       generatorConfig: {
-        yearRange: [1927, 2026],
+        yearRange: [1920, 2050],
         orderBy: "year_desc"
       },
       

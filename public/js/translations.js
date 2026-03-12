@@ -16,16 +16,16 @@ const translations = {
     pwTypeDescription: "Before you enter your password, tell the system what <strong>kind</strong> of password you are using. The instructor&rsquo;s brute-force cracker uses this hint to pick the right <strong>search space</strong> to iterate through &mdash; so please choose honestly!",
     pwTypeWhyMatters: "&#x1F4CA; Why Does Password Type Matter?",
     pwTypeWhyMattersText: "Two passwords can produce completely different-looking SHA-256 hashes, yet one can be cracked in <strong style=\"color:#f88;\">milliseconds</strong> and the other would take <strong style=\"color:#8f8;\">millions of years</strong>. The difference is not the hash algorithm &mdash; it is the <em>size of the search space</em>.",
-    pwTypeCrackerWorks: "&#x1F50D; <strong>How the cracker works:</strong><br>For a <em>birthday</em> there are only ~36,500 plausible dates. The cracker hashes every single one in under 40&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password there are 218 trillion possibilities &mdash; the same approach would take years.",
+    pwTypeCrackerWorks: "&#x1F50D; <strong>How the cracker works:</strong><br>For a <em>birthday</em> there are only ~47,800 plausible dates (1920–2050). The cracker hashes every single one in under 50&nbsp;ms and finds a match instantly. For an <em>8-character alphanumeric</em> password there are 218 trillion possibilities &mdash; the same approach would take years.",
     
     // Password Type Descriptions (from backend API)
-    pwTypeDescBirthday: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Very common and very easy to crack.",
+    pwTypeDescBirthday: "An 8-digit password derived from a birth date in DDMMYYYY format (e.g. 15081990). Range 1920–2050 (~47,800 valid dates). Very common and very easy to crack.",
     pwTypeDescDigits8: "An 8-digit numeric password like a PIN code (e.g. 12345678). Commonly used but extremely weak against brute-force attacks.",
     pwTypeDescLowercase8: "An 8-character password using only lowercase letters (e.g. 'password'). Larger search space than digits, but still vulnerable to dictionary and brute-force attacks.",
     pwTypeDescAlphanumeric8: "An 8-character password using both lowercase and uppercase letters plus digits (e.g. 'Admin123', 'Pass2024'). More secure than lowercase-only but still vulnerable without special characters.",
     
     // Password Type Cracking Hints
-    pwTypeCrackHintBirthday: "Brute-forceable in milliseconds — only ~36.5k valid calendar dates.",
+    pwTypeCrackHintBirthday: "Brute-forceable in milliseconds — only ~47.8k valid calendar dates (1920–2050).",
     pwTypeCrackHintDigits8: "100 million combinations — crackable in under 2 minutes on a browser, instantly on a GPU.",
     pwTypeCrackHintLowercase8: "208 billion combinations — takes days in a browser, but only seconds on a GPU. Dictionary attacks crack common words instantly.",
     pwTypeCrackHintAlphanumeric8: "Full brute-force takes years in browser (~6.9 years), but only hours on GPU (~2.8 hours). Common patterns (Admin123, Password1) are cracked instantly via dictionary attacks.",
@@ -49,7 +49,7 @@ const translations = {
     hashingFooter: "Your password is never sent to the server. Instead, your browser computes this one-way fingerprint &mdash; and only the hash is transmitted.",
     warningTitle: "&#x26A0; The Illusion of Safety:",
     warningText: "Even though we use a secure <strong>SHA-256 hash</strong> (meaning the server never sees your password), this system is still extremely easy to hack. Why? Because birthdays are <strong>predictable</strong>.",
-    attackDescription: "An attacker doesn't need to \"reverse\" the hash. They just use a <strong>brute-force function</strong>: they take every possible date in a 100-year range (~36,500 dates), hash each one, and compare them to your hash. On a modern computer, this takes <strong>less than a second</strong>. This project proves that even with strong math (hashing), a weak or predictable password makes your security irrelevant.",
+    attackDescription: "An attacker doesn't need to \"reverse\" the hash. They just use a <strong>brute-force function</strong>: they take every possible date in a 131-year range (~47,800 dates, 1920–2050), hash each one, and compare them to your hash. On a modern computer, this takes <strong>less than a second</strong>. This project proves that even with strong math (hashing), a weak or predictable password makes your security irrelevant.",
     
     // Password Space Analysis
     passwordSpaceTitle: "&#x1F522; Password Character Space &amp; Brute Force Times",
@@ -102,7 +102,7 @@ const translations = {
     
     // Key takeaways
     keyTakeawaysTitle: "&#x1F4A1; Key Takeaways",
-    takeaway1: "<strong>Birthdays are trivial to crack</strong> &mdash; under 40 milliseconds, even in a browser",
+    takeaway1: "<strong>Birthdays are trivial to crack</strong> &mdash; under 50 milliseconds, even in a browser",
     takeaway2: "<strong>Length beats complexity</strong> &mdash; 12-char alphanumeric (102M years) &gt;&gt; 8-char + special chars (193 years)",
     takeaway3: "<strong>GPUs obliterate weak passwords</strong> &mdash; what takes 6.9 years in a browser falls to 2.8 hours on a $1,600 GPU",
     takeaway4: "<strong>This assumes NO <a href=\"https://en.wikipedia.org/wiki/Salt_(cryptography)\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8f8;text-decoration:underline;\">salting</a></strong> &mdash; with proper salting, GPU attacks become impractical even for weak passwords",
@@ -146,16 +146,16 @@ const translations = {
     pwTypeDescription: "Bevor du dein Passwort eingibst, teile dem System mit, welche <strong>Art</strong> von Passwort du verwendest. Der Brute-Force-Cracker des Dozenten nutzt diesen Hinweis, um den richtigen <strong>Suchraum</strong> zu durchlaufen &mdash; bitte wähle ehrlich!",
     pwTypeWhyMatters: "&#x1F4CA; Warum ist der Passworttyp wichtig?",
     pwTypeWhyMattersText: "Zwei Passwörter können völlig unterschiedlich aussehende SHA-256-Hashes erzeugen, dennoch kann das eine in <strong style=\"color:#f88;\">Millisekunden</strong> geknackt werden und das andere würde <strong style=\"color:#8f8;\">Millionen Jahre</strong> dauern. Der Unterschied liegt nicht im Hash-Algorithmus &mdash; sondern in der <em>Größe des Suchraums</em>.",
-    pwTypeCrackerWorks: "&#x1F50D; <strong>So funktioniert der Cracker:</strong><br>Für ein <em>Geburtsdatum</em> gibt es nur ~36.500 plausible Daten. Der Cracker hasht jedes einzelne in unter 40&nbsp;ms und findet sofort eine Übereinstimmung. Für ein <em>8-stelliges alphanumerisches</em> Passwort gibt es 218 Billionen Möglichkeiten &mdash; derselbe Ansatz würde Jahre dauern.",
+    pwTypeCrackerWorks: "&#x1F50D; <strong>So funktioniert der Cracker:</strong><br>Für ein <em>Geburtsdatum</em> gibt es nur ~47.800 plausible Daten (1920–2050). Der Cracker hasht jedes einzelne in unter 50&nbsp;ms und findet sofort eine Übereinstimmung. Für ein <em>8-stelliges alphanumerisches</em> Passwort gibt es 218 Billionen Möglichkeiten &mdash; derselbe Ansatz würde Jahre dauern.",
     
     // Password Type Descriptions (from backend API)
-    pwTypeDescBirthday: "Ein 8-stelliges Passwort abgeleitet von einem Geburtsdatum im Format TTMMJJJJ (z.B. 15081990). Sehr verbreitet und sehr leicht zu knacken.",
+    pwTypeDescBirthday: "Ein 8-stelliges Passwort abgeleitet von einem Geburtsdatum im Format TTMMJJJJ (z.B. 15081990). Bereich 1920–2050 (~47.800 gültige Daten). Sehr verbreitet und sehr leicht zu knacken.",
     pwTypeDescDigits8: "Ein 8-stelliges numerisches Passwort wie ein PIN-Code (z.B. 12345678). Häufig verwendet, aber extrem schwach gegen Brute-Force-Angriffe.",
     pwTypeDescLowercase8: "Ein 8-stelliges Passwort nur aus Kleinbuchstaben (z.B. 'password'). Größerer Suchraum als Ziffern, aber immer noch anfällig für Wörterbuch- und Brute-Force-Angriffe.",
     pwTypeDescAlphanumeric8: "Ein 8-stelliges Passwort mit Klein- und Großbuchstaben plus Ziffern (z.B. 'Admin123', 'Pass2024'). Sicherer als nur Kleinbuchstaben, aber ohne Sonderzeichen immer noch anfällig.",
     
     // Password Type Cracking Hints
-    pwTypeCrackHintBirthday: "Per Brute-Force in Millisekunden knackbar — nur ~36,5k gültige Kalenderdaten.",
+    pwTypeCrackHintBirthday: "Per Brute-Force in Millisekunden knackbar — nur ~47,8k gültige Kalenderdaten (1920–2050).",
     pwTypeCrackHintDigits8: "100 Millionen Kombinationen — knackbar in unter 2 Minuten im Browser, sofort auf einer GPU.",
     pwTypeCrackHintLowercase8: "208 Milliarden Kombinationen — dauert Tage im Browser, aber nur Sekunden auf einer GPU. Wörterbuchangriffe knacken gängige Wörter sofort.",
     pwTypeCrackHintAlphanumeric8: "Vollständiges Brute-Force dauert Jahre im Browser (~6,9 Jahre), aber nur Stunden auf GPU (~2,8 Stunden). Gängige Muster (Admin123, Password1) werden sofort per Wörterbuchangriff geknackt.",
@@ -179,7 +179,7 @@ const translations = {
     hashingFooter: "Dein Passwort wird niemals an den Server gesendet. Stattdessen berechnet dein Browser diesen Einweg-Fingerabdruck &mdash; und nur der Hash wird übertragen.",
     warningTitle: "&#x26A0; Die Illusion der Sicherheit:",
     warningText: "Obwohl wir einen sicheren <strong>SHA-256-Hash</strong> verwenden (was bedeutet, dass der Server dein Passwort nie sieht), ist dieses System immer noch extrem leicht zu hacken. Warum? Weil Geburtsdaten <strong>vorhersehbar</strong> sind.",
-    attackDescription: "Ein Angreifer muss den Hash nicht \"umkehren\". Er verwendet einfach eine <strong>Brute-Force-Funktion</strong>: Er nimmt jedes mögliche Datum in einem 100-Jahres-Bereich (~36.500 Daten), hasht jedes einzelne und vergleicht sie mit deinem Hash. Auf einem modernen Computer dauert das <strong>weniger als eine Sekunde</strong>. Dieses Projekt beweist, dass selbst mit starker Mathematik (Hashing) ein schwaches oder vorhersehbares Passwort deine Sicherheit irrelevant macht.",
+    attackDescription: "Ein Angreifer muss den Hash nicht \"umkehren\". Er verwendet einfach eine <strong>Brute-Force-Funktion</strong>: Er nimmt jedes mögliche Datum in einem 131-Jahres-Bereich (~47.800 Daten, 1920–2050), hasht jedes einzelne und vergleicht sie mit deinem Hash. Auf einem modernen Computer dauert das <strong>weniger als eine Sekunde</strong>. Dieses Projekt beweist, dass selbst mit starker Mathematik (Hashing) ein schwaches oder vorhersehbares Passwort deine Sicherheit irrelevant macht.",
     
     // Password Space Analysis
     passwordSpaceTitle: "&#x1F522; Passwort-Zeichenraum &amp; Brute-Force-Zeiten",
@@ -232,7 +232,7 @@ const translations = {
     
     // Key takeaways
     keyTakeawaysTitle: "&#x1F4A1; Wichtige Erkenntnisse",
-    takeaway1: "<strong>Geburtsdaten sind trivial zu knacken</strong> &mdash; unter 40 Millisekunden, sogar in einem Browser",
+    takeaway1: "<strong>Geburtsdaten sind trivial zu knacken</strong> &mdash; unter 50 Millisekunden, sogar in einem Browser",
     takeaway2: "<strong>Länge schlägt Komplexität</strong> &mdash; 12 Zeichen alphanumerisch (102M Jahre) &gt;&gt; 8 Zeichen + Sonderzeichen (193 Jahre)",
     takeaway3: "<strong>GPUs vernichten schwache Passwörter</strong> &mdash; was 6,9 Jahre im Browser dauert, fällt auf 2,8 Stunden mit einer $1.600 GPU",
     takeaway4: "<strong>Dies setzt KEIN <a href=\"https://de.wikipedia.org/wiki/Salt_(Kryptographie)\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8f8;text-decoration:underline;\">Salting</a> voraus</strong> &mdash; mit ordnungsgemäßem Salting werden GPU-Angriffe selbst für schwache Passwörter unpraktisch",
