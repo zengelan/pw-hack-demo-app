@@ -27,6 +27,10 @@ const PasswordSpaces = {
   
   /**
    * Get generator for a password type
+   * @param {string} passwordTypeId
+   * @param {object} options - { offset: number, limit: number }
+   *   offset: how many entries to skip from the start (default 0)
+   *   limit:  max entries to yield after offset (default: all remaining)
    */
   getGenerator(passwordTypeId, options = {}) {
     const type = this.typesById[passwordTypeId];
@@ -43,7 +47,6 @@ const PasswordSpaces = {
       throw new Error(`Password type ${passwordTypeId} has no generatorType defined`);
     }
     
-    // Select generator implementation
     switch (generatorType) {
       case 'calendar':
         return this.generators.calendar(strategy.generatorConfig, options);
@@ -57,28 +60,42 @@ const PasswordSpaces = {
   },
   
   /**
-   * Generator implementations
+   * Generator implementations.
+   * All generators now support options.offset (skip N entries) and options.limit (yield at most N entries).
    */
   generators: {
     
     /**
      * Calendar date generator (DDMMYYYY)
+     * Supports offset/limit for efficient worker sharding.
      */
-    calendar: function* (config, options) {
+    calendar: function* (config, options = {}) {
       const [yearMin, yearMax] = config.yearRange;
       const orderDesc = config.orderBy === 'year_desc';
+      const offset = options.offset || 0;
+      const limit = options.limit != null ? options.limit : Infinity;
       
       const years = [];
       for (let y = yearMin; y <= yearMax; y++) years.push(y);
       if (orderDesc) years.reverse();
       
+      let globalIndex = 0;
+      let yielded = 0;
+      
       for (const year of years) {
         for (let month = 1; month <= 12; month++) {
           const daysInMonth = new Date(year, month, 0).getDate();
           for (let day = 1; day <= daysInMonth; day++) {
-            yield String(day).padStart(2, '0') + 
-                  String(month).padStart(2, '0') + 
+            if (globalIndex < offset) {
+              globalIndex++;
+              continue;
+            }
+            if (yielded >= limit) return;
+            yield String(day).padStart(2, '0') +
+                  String(month).padStart(2, '0') +
                   String(year);
+            globalIndex++;
+            yielded++;
           }
         }
       }
@@ -86,30 +103,43 @@ const PasswordSpaces = {
     
     /**
      * Numeric range generator (00000000-99999999)
+     * Supports offset/limit for efficient worker sharding.
      */
-    numericRange: function* (config, options) {
+    numericRange: function* (config, options = {}) {
       const { min, max, padding } = config;
-      const limit = options.limit || (max - min + 1);
-      const actualMax = Math.min(max, min + limit - 1);
+      const offset = options.offset || 0;
+      const limit = options.limit != null ? options.limit : (max - min + 1);
       
-      for (let i = min; i <= actualMax; i++) {
+      const startAt = min + offset;
+      const stopBefore = Math.min(max + 1, startAt + limit);
+      
+      for (let i = startAt; i < stopBefore; i++) {
         yield String(i).padStart(padding, '0');
       }
     },
     
     /**
      * Combinatorial generator (aaaaaaaa-zzzzzzzz)
+     * Supports offset/limit for efficient worker sharding.
+     * Uses direct index arithmetic to jump to offset in O(length) — no loop needed.
      */
-    combinatorial: function* (config, options) {
+    combinatorial: function* (config, options = {}) {
       const { alphabet, length } = config;
-      const limit = options.limit || Infinity;
+      const offset = options.offset || 0;
+      const limit = options.limit != null ? options.limit : Infinity;
       const base = alphabet.length;
       
-      let count = 0;
+      // Convert linear offset to base-N indices directly (O(length) jump, no skipping)
       const indices = new Array(length).fill(0);
+      let remaining = offset;
+      for (let pos = length - 1; pos >= 0 && remaining > 0; pos--) {
+        indices[pos] = remaining % base;
+        remaining = Math.floor(remaining / base);
+      }
+      if (remaining > 0) return; // offset exceeds total space
       
+      let count = 0;
       while (count < limit) {
-        // Convert indices to string
         yield indices.map(i => alphabet[i]).join('');
         count++;
         
@@ -121,8 +151,7 @@ const PasswordSpaces = {
           indices[pos] = 0;
           pos--;
         }
-        
-        if (pos < 0) break; // Overflow, exhausted space
+        if (pos < 0) break; // Exhausted entire space
       }
     }
   },
@@ -147,7 +176,6 @@ const PasswordSpaces = {
       return 0;
     }
     
-    // Check truncation
     if (options.truncationMode) {
       const mode = strategy.truncationModes?.find(m => m.name === options.truncationMode);
       if (mode) return mode.limit;
@@ -171,6 +199,5 @@ const PasswordSpaces = {
 
 // Export for worker environment
 if (typeof self !== 'undefined' && typeof window === 'undefined') {
-  // Inside worker
   self.PasswordSpaces = PasswordSpaces;
 }

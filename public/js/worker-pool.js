@@ -40,7 +40,6 @@ class WorkerPool {
   async crack(targetHash, passwordType, options = {}) {
     if (!this.workers.length) this.init();
     
-    // Safely access bruteForceStrategy with null checks
     const strategy = passwordType?.bruteForceStrategy || {};
     let totalAttempts = 0;
     const startTime = Date.now();
@@ -50,7 +49,7 @@ class WorkerPool {
     // Phase 1: Dictionary Attack (if supported)
     if (strategy.dictionarySupport && options.dictionary && options.dictionary.length > 0) {
       const dictStartTime = Date.now();
-      console.log(`[Pool] 📚 Phase 1: Dictionary attack starting (${options.dictionary.length.toLocaleString()} words)`);
+      console.log(`[Pool] 📚 Phase 1: Dictionary attack starting (${options.dictionary.length.toLocaleString()} words, ${this.workers.length} workers)`);
       
       const dictResult = await this._runDictionaryAttack(
         targetHash,
@@ -75,7 +74,7 @@ class WorkerPool {
     } else {
       if (!strategy.dictionarySupport) {
         console.log(`[Pool] ⏭️  Skipping dictionary phase (not supported for ${passwordType.id})`);
-      } else if (!options.dictionary || options.dictionary.length === 0) {
+      } else {
         console.log(`[Pool] ⏭️  Skipping dictionary phase (no dictionary loaded)`);
       }
     }
@@ -108,82 +107,82 @@ class WorkerPool {
   }
   
   /**
-   * Dictionary attack (single worker, sequential)
+   * Dictionary attack — split across ALL workers for parallel hashing.
+   * Previously only used workers[0]; now all workers share the load.
    */
   _runDictionaryAttack(targetHash, dictionary, onProgress) {
     return new Promise((resolve) => {
-      const worker = this.workers[0];
-      let lastProgressLog = 0;
+      const numWorkers = this.workers.length;
+      const chunkSize = Math.ceil(dictionary.length / numWorkers);
+      let completed = 0;
+      let totalAttempts = 0;
+      let found = false;
+      
+      console.log(`[Pool] 📖 Splitting ${dictionary.length.toLocaleString()} words across ${numWorkers} workers (${chunkSize.toLocaleString()} per worker)`);
       
       const cleanup = () => {
-        worker.onmessage = null;
-        worker.onerror = null;
+        this.workers.forEach(w => { w.onmessage = null; w.onerror = null; });
       };
       
-      worker.onmessage = (e) => {
-        const { type, data } = e.data;
+      const cancelOthers = () => {
+        this.workers.forEach(w => w.postMessage({ action: 'cancel' }));
+      };
+      
+      this.workers.forEach((worker, i) => {
+        const chunk = dictionary.slice(i * chunkSize, (i + 1) * chunkSize);
+        if (chunk.length === 0) {
+          completed++;
+          return;
+        }
         
-        if (type === 'progress' && onProgress) {
-          // Log every 25% progress
-          const percent = Math.floor((data.attempts / dictionary.length) * 100);
-          if (percent >= lastProgressLog + 25) {
-            console.log(`[Pool] 📖 Dictionary progress: ${percent}% (${data.attempts.toLocaleString()}/${dictionary.length.toLocaleString()} words, ${data.speed.toLocaleString()} H/s)`);
-            lastProgressLog = percent;
+        worker.onmessage = (e) => {
+          if (found) return;
+          const { type, data } = e.data;
+          
+          if (type === 'progress' && onProgress) {
+            onProgress({ phase: 'dictionary', current: data.current, attempts: data.attempts, speed: data.speed, total: chunk.length });
           }
           
-          onProgress({
-            phase: 'dictionary',
-            current: data.current,
-            attempts: data.attempts,
-            speed: data.speed,
-            total: dictionary.length
-          });
-        }
+          if (type === 'found') {
+            found = true;
+            cancelOthers();
+            cleanup();
+            resolve({ found: true, password: data.password, attempts: data.attempts });
+          }
+          
+          if (type === 'exhausted') {
+            totalAttempts += data.attempts;
+            completed++;
+            if (completed === numWorkers) { cleanup(); resolve({ found: false, attempts: totalAttempts }); }
+          }
+          
+          if (type === 'cancelled') {
+            completed++;
+            if (completed === numWorkers && !found) { cleanup(); resolve({ found: false, attempts: totalAttempts }); }
+          }
+        };
         
-        if (type === 'found') {
-          cleanup();
-          resolve({
-            found: true,
-            password: data.password,
-            attempts: data.attempts
-          });
-        }
+        worker.onerror = (err) => {
+          console.error(`[Pool] ❌ Worker ${i} error during dictionary attack:`, err);
+          completed++;
+          if (completed === numWorkers && !found) { cleanup(); resolve({ found: false, attempts: totalAttempts }); }
+        };
         
-        if (type === 'exhausted') {
-          cleanup();
-          resolve({
-            found: false,
-            attempts: data.attempts
-          });
-        }
-      };
-      
-      worker.onerror = (err) => {
-        console.error('[Pool] ❌ Worker error during dictionary attack:', err);
-        cleanup();
-        resolve({ found: false, attempts: 0 });
-      };
-      
-      console.log(`[Pool] 📤 Sending dictionary to worker (${dictionary.length.toLocaleString()} words)`);
-      worker.postMessage({
-        action: 'dictionary',
-        targetHash,
-        dictionary
+        console.log(`[Pool] 📤 Worker ${i}: dictionary chunk ${chunk.length.toLocaleString()} words`);
+        worker.postMessage({ action: 'dictionary', targetHash, dictionary: chunk });
       });
     });
   }
   
   /**
-   * Brute-force attack (parallel across all workers)
+   * Brute-force attack (parallel across all workers).
+   * Workers receive offset+limit and jump directly to their range via the improved generator API.
+   * When any worker finds the password, all other workers are cancelled immediately.
    */
   _runBruteForceAttack(targetHash, passwordType, options, baseAttempts) {
     return new Promise((resolve) => {
       const numWorkers = this.workers.length;
-      const totalSpace = PasswordSpaces.getEstimatedAttempts(
-        passwordType.id,
-        options
-      );
-      
+      const totalSpace = PasswordSpaces.getEstimatedAttempts(passwordType.id, options);
       const rangeSize = Math.ceil(totalSpace / numWorkers);
       let completed = 0;
       let totalAttempts = 0;
@@ -195,36 +194,32 @@ class WorkerPool {
       console.log(`[Pool] 🔨 Distributing ${totalSpace.toLocaleString()} attempts across ${numWorkers} workers (${rangeSize.toLocaleString()} per worker)`);
       
       const cleanup = () => {
-        this.workers.forEach(w => {
-          w.onmessage = null;
-          w.onerror = null;
-        });
+        this.workers.forEach(w => { w.onmessage = null; w.onerror = null; });
+      };
+      
+      const cancelOthers = () => {
+        this.workers.forEach(w => w.postMessage({ action: 'cancel' }));
       };
       
       const onWorkerMessage = (workerId) => (e) => {
         if (found) return;
-        
         const { type, data } = e.data;
         
         if (type === 'progress') {
           progressAggregator[workerId] = data.attempts;
           
           if (options.onProgress) {
-            const aggregatedAttempts = Object.values(progressAggregator)
-              .reduce((sum, a) => sum + a, 0);
-            
-            // Log every 10% progress
+            const aggregatedAttempts = Object.values(progressAggregator).reduce((sum, a) => sum + a, 0);
             const percent = Math.floor((aggregatedAttempts / totalSpace) * 100);
             if (percent >= lastProgressLog + 10) {
-              console.log(`[Pool] 🔨 Brute-force progress: ${percent}% (${aggregatedAttempts.toLocaleString()}/${totalSpace.toLocaleString()} attempts, ~${(data.speed * numWorkers).toLocaleString()} H/s)`);
+              console.log(`[Pool] 🔨 Brute-force progress: ${percent}% (${aggregatedAttempts.toLocaleString()}/${totalSpace.toLocaleString()}, ~${(data.speed * numWorkers).toLocaleString()} H/s)`);
               lastProgressLog = percent;
             }
-            
             options.onProgress({
               phase: 'brute-force',
               current: data.current,
               attempts: baseAttempts + aggregatedAttempts,
-              speed: data.speed * numWorkers, // Aggregate speed
+              speed: data.speed * numWorkers,
               total: totalSpace
             });
           }
@@ -233,53 +228,38 @@ class WorkerPool {
         if (type === 'found') {
           found = true;
           console.log(`[Pool] ✅ Worker ${workerId} found password: "${data.password}"`);
+          // Cancel remaining workers immediately to free CPU
+          cancelOthers();
           cleanup();
+          // Use accurate attempt count: aggregated progress + winning worker's final attempts
+          const aggregatedSoFar = Object.values(progressAggregator).reduce((sum, a) => sum + a, 0);
           resolve({
             password: data.password,
-            attempts: baseAttempts + Object.values(progressAggregator)
-              .reduce((sum, a) => sum + a, 0)
+            attempts: aggregatedSoFar + data.attempts
           });
         }
         
         if (type === 'exhausted') {
           completed++;
           totalAttempts += data.attempts;
-          console.log(`[Pool] 🔨 Worker ${workerId} exhausted (${data.attempts.toLocaleString()} attempts, ${completed}/${numWorkers} workers done)`);
-          
-          if (completed === numWorkers) {
-            cleanup();
-            resolve({
-              password: null,
-              attempts: totalAttempts
-            });
-          }
+          console.log(`[Pool] 🔨 Worker ${workerId} exhausted (${data.attempts.toLocaleString()} attempts, ${completed}/${numWorkers} done)`);
+          if (completed === numWorkers) { cleanup(); resolve({ password: null, attempts: totalAttempts }); }
         }
       };
       
-      // Start all workers with their ranges
       this.workers.forEach((worker, i) => {
         worker.onmessage = onWorkerMessage(i);
         worker.onerror = (err) => {
           console.error(`[Pool] ❌ Worker ${i} error:`, err);
           completed++;
-          if (completed === numWorkers) {
-            cleanup();
-            resolve({ password: null, attempts: totalAttempts });
-          }
+          if (completed === numWorkers) { cleanup(); resolve({ password: null, attempts: totalAttempts }); }
         };
         
         const offset = i * rangeSize;
         const limit = Math.min(rangeSize, totalSpace - offset);
         
         console.log(`[Pool] 📤 Worker ${i}: offset=${offset.toLocaleString()}, limit=${limit.toLocaleString()}`);
-        
-        worker.postMessage({
-          action: 'brute-force',
-          targetHash,
-          passwordType,
-          offset,
-          limit
-        });
+        worker.postMessage({ action: 'brute-force', targetHash, passwordType, offset, limit });
       });
     });
   }
@@ -289,9 +269,7 @@ class WorkerPool {
    */
   cancel() {
     console.log('[Pool] 🛑 Cancelling all workers');
-    this.workers.forEach(w => {
-      w.postMessage({ action: 'cancel' });
-    });
+    this.workers.forEach(w => w.postMessage({ action: 'cancel' }));
     this.activeTask = null;
   }
 }
