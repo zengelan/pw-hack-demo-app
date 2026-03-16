@@ -154,7 +154,8 @@ const PASSWORD_TYPES = [
       dictionaryUrls: [
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/best1050.txt",
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Leaked-Databases/rockyou-75.txt",
-        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/probable-v2-wpa-top4800.txt",
+        // Fixed: was Passwords/probable-v2-wpa-top4800.txt (404). Correct source is berzerk0/Probable-Wordlists
+        "https://raw.githubusercontent.com/berzerk0/Probable-Wordlists/master/Real-Passwords/WPA-Length/Top4800-WPA-probable-v2.txt",
         "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
       ],
       dictionaryFilterRegex: "^[a-zA-Z0-9]{8}$",
@@ -346,7 +347,7 @@ class HashcatCracker:
         strategy = password_type.brute_force_strategy
         results  = {}
 
-        print(f"\n{'='*60}")
+        print(f"\\n{'='*60}")
         print(f"Type: {password_type.label}")
         print(f"Format: {password_type.format}  |  Space: {password_type.char_space}")
         print(f"Hashes: {len(hashes)}  |  Combinations: {password_type.possible_values:,}")
@@ -428,13 +429,13 @@ def main():
     print("Loading exported data...")
     hashes, password_types, meta = load_data()
 
-    print(f"\n{'='*60}")
+    print(f"\\n{'='*60}")
     print(f"GPU Password Cracker Export")
     print(f"Export ID  : {meta.export_id}")
     print(f"Timestamp  : {meta.export_timestamp}")
     print(f"Total      : {meta.total_submissions}  Cracked: {meta.cracked_count}  Remaining: {meta.remaining_count}")
     print(f"Browser    : {meta.browser_attempts:,} attempts  Stopped: {meta.stopped_reason}")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}\\n")
 
     if args.status:
         by_type = {}
@@ -474,7 +475,7 @@ def main():
 
     duration = time.time() - t0
 
-    print(f"\n{'='*60}")
+    print(f"\\n{'='*60}")
     print(f"RESULTS: {len(all_results)} / {len(hashes)} cracked in {duration:.2f}s")
     print(f"{'='*60}")
 
