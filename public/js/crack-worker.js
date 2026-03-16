@@ -45,7 +45,6 @@ async function dictionaryAttack({ targetHash, dictionary }) {
     attempts++;
     const hash = await sha256(word);
     
-    // Debug first few attempts
     if (debugLogCount < 3) {
       console.log(`[Worker] Dict attempt ${attempts}: "${word}" -> ${hash.substring(0,16)}...`);
       debugLogCount++;
@@ -53,55 +52,41 @@ async function dictionaryAttack({ targetHash, dictionary }) {
     
     if (hash === targetHash) {
       console.log(`[Worker] ✅ FOUND via dictionary! "${word}" at attempt ${attempts}`);
-      self.postMessage({
-        type: 'found',
-        data: { password: word, attempts }
-      });
+      self.postMessage({ type: 'found', data: { password: word, attempts } });
       return;
     }
     
     if (attempts % 5000 === 0) {
       const elapsed = Date.now() - startTime;
       const speed = elapsed > 0 ? Math.floor(attempts / (elapsed / 1000)) : 0;
-      
-      self.postMessage({
-        type: 'progress',
-        data: { current: word, attempts, speed }
-      });
+      self.postMessage({ type: 'progress', data: { current: word, attempts, speed } });
     }
   }
   
   console.log(`[Worker] Dictionary exhausted after ${attempts} attempts`);
-  self.postMessage({
-    type: 'exhausted',
-    data: { attempts }
-  });
+  self.postMessage({ type: 'exhausted', data: { attempts } });
 }
 
 /**
- * Brute-force attack with offset and limit
+ * Brute-force attack with offset and limit.
+ * Passes offset+limit directly to the generator — no manual skip loop needed.
+ * numericRange and combinatorial jump to the offset in O(1)/O(length).
+ * calendar iterates but skips without hashing, which is still much cheaper.
  */
 async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
-  // Initialize PasswordSpaces if not already
   if (!PasswordSpaces.types.length) {
     await PasswordSpaces.init();
   }
   
   console.log(`[Worker] Brute-force started: type=${passwordType.id}, offset=${offset}, limit=${limit}, target=${targetHash.substring(0,16)}...`);
   
-  const generator = PasswordSpaces.getGenerator(passwordType.id, { limit: offset + limit });
+  // Generator starts at the correct position — no skip loop required
+  const generator = PasswordSpaces.getGenerator(passwordType.id, { offset, limit });
   
   let attempts = 0;
-  let skipped = 0;
   const startTime = Date.now();
   
-  // Skip to offset
   for (const candidate of generator) {
-    if (skipped < offset) {
-      skipped++;
-      continue;
-    }
-    
     if (cancelled) {
       self.postMessage({ type: 'cancelled', data: { attempts } });
       return;
@@ -110,11 +95,10 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
     attempts++;
     const hash = await sha256(candidate);
     
-    // Debug first few attempts
     if (debugLogCount < 3) {
-      console.log(`[Worker] BF attempt ${attempts}: "${candidate}" -> ${hash.substring(0,16)}...`);
+      console.log(`[Worker] BF attempt ${attempts} (global ${offset + attempts}): "${candidate}" -> ${hash.substring(0,16)}...`);
       if (debugLogCount === 0) {
-        console.log(`[Worker] Target hash: ${targetHash}`);
+        console.log(`[Worker] Target hash:    ${targetHash}`);
         console.log(`[Worker] Generated hash: ${hash}`);
         console.log(`[Worker] Match: ${hash === targetHash}`);
       }
@@ -122,32 +106,20 @@ async function bruteForceAttack({ targetHash, passwordType, offset, limit }) {
     }
     
     if (hash === targetHash) {
-      console.log(`[Worker] ✅ FOUND via brute-force! "${candidate}" at attempt ${attempts}`);
-      self.postMessage({
-        type: 'found',
-        data: { password: candidate, attempts }
-      });
+      console.log(`[Worker] ✅ FOUND via brute-force! "${candidate}" at attempt ${attempts} (global ${offset + attempts})`);
+      self.postMessage({ type: 'found', data: { password: candidate, attempts } });
       return;
     }
     
     if (attempts % 5000 === 0) {
       const elapsed = Date.now() - startTime;
       const speed = elapsed > 0 ? Math.floor(attempts / (elapsed / 1000)) : 0;
-      
-      self.postMessage({
-        type: 'progress',
-        data: { current: candidate, attempts, speed }
-      });
+      self.postMessage({ type: 'progress', data: { current: candidate, attempts, speed } });
     }
-    
-    if (attempts >= limit) break;
   }
   
   console.log(`[Worker] Brute-force exhausted after ${attempts} attempts (limit: ${limit})`);
-  self.postMessage({
-    type: 'exhausted',
-    data: { attempts }
-  });
+  self.postMessage({ type: 'exhausted', data: { attempts } });
 }
 
 /**

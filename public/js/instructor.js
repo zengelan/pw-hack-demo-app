@@ -21,8 +21,10 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
-// --- Throttled UI state for Candidate / Speed / Estimated (max once per 3s) ---
-const STATS_UI_UPDATE_MS = 3000;
+// --- Throttled UI state for Candidate / Speed / Estimated ---
+// Increase this value to slow down UI refresh during cracking (milliseconds).
+// Lower values = more frequent updates but more DOM churn.
+const STATS_UI_UPDATE_MS = 5000;
 let lastStatsUiUpdateAt = 0;
 let latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
 
@@ -370,6 +372,11 @@ async function startCracking() {
   latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
   flushThrottledStatsUi(true);
   
+  // Apply the selected worker count — re-inits pool only if count changed
+  const numWorkers = getWorkerCount();
+  console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
+  workerPool.setWorkerCount(numWorkers);
+  
   // Start logger session
   if (typeof ProgressLogger !== 'undefined') {
     ProgressLogger.startSession();
@@ -379,11 +386,6 @@ async function startCracking() {
   document.getElementById('btn-start-crack').style.display = 'none';
   document.getElementById('btn-pause-crack').style.display = 'inline-block';
   document.getElementById('btn-stop-crack').style.display = 'inline-block';
-  
-  const numWorkers = getWorkerCount();
-  console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
-  
-  workerPool.maxWorkers = numWorkers;
   
   await processBatch();
 }
@@ -500,7 +502,7 @@ async function processBatch() {
 }
 
 function updateProgress(progress) {
-  // Buffer the 3 volatile fields — they are flushed to DOM at most once per 3s
+  // Buffer the 3 volatile fields — flushed to DOM at most once per STATS_UI_UPDATE_MS
   latestStatsUi.candidate = progress.current || '—';
   latestStatsUi.speed     = formatSpeed(progress.speed || 0);
 
@@ -531,7 +533,7 @@ function updateProgress(progress) {
   document.getElementById('metric-phase').textContent =
     `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
 
-  // Flush candidate/speed/estimated at most once per 3 seconds
+  // Flush candidate/speed/estimated at most once per STATS_UI_UPDATE_MS
   flushThrottledStatsUi(false);
 }
 
@@ -637,6 +639,7 @@ function pauseCracking() {
     ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
   }
   
+  // Send cancel signal to stop current work — workers stay alive for resume
   if (workerPool) {
     workerPool.cancel();
   }
@@ -650,6 +653,11 @@ function resumeCracking() {
   if (typeof ProgressLogger !== 'undefined') {
     ProgressLogger.logEvent('info', '▶️ Cracking resumed');
   }
+  
+  // Ensure workers are alive with the correct count before resuming
+  // (cancel() keeps them alive, but setWorkerCount guards against any edge case)
+  const numWorkers = getWorkerCount();
+  workerPool.setWorkerCount(numWorkers);
   
   processBatch();
 }
