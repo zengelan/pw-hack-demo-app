@@ -372,6 +372,11 @@ async function startCracking() {
   latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
   flushThrottledStatsUi(true);
   
+  // Apply the selected worker count — re-inits pool only if count changed
+  const numWorkers = getWorkerCount();
+  console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
+  workerPool.setWorkerCount(numWorkers);
+  
   // Start logger session
   if (typeof ProgressLogger !== 'undefined') {
     ProgressLogger.startSession();
@@ -381,11 +386,6 @@ async function startCracking() {
   document.getElementById('btn-start-crack').style.display = 'none';
   document.getElementById('btn-pause-crack').style.display = 'inline-block';
   document.getElementById('btn-stop-crack').style.display = 'inline-block';
-  
-  const numWorkers = getWorkerCount();
-  console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
-  
-  workerPool.maxWorkers = numWorkers;
   
   await processBatch();
 }
@@ -639,6 +639,7 @@ function pauseCracking() {
     ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
   }
   
+  // Send cancel signal to stop current work — workers stay alive for resume
   if (workerPool) {
     workerPool.cancel();
   }
@@ -652,6 +653,11 @@ function resumeCracking() {
   if (typeof ProgressLogger !== 'undefined') {
     ProgressLogger.logEvent('info', '▶️ Cracking resumed');
   }
+  
+  // Ensure workers are alive with the correct count before resuming
+  // (cancel() keeps them alive, but setWorkerCount guards against any edge case)
+  const numWorkers = getWorkerCount();
+  workerPool.setWorkerCount(numWorkers);
   
   processBatch();
 }

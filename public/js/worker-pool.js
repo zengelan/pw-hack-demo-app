@@ -18,7 +18,24 @@ class WorkerPool {
     console.log(`[Pool] Worker pool initialized: ${this.maxWorkers} workers`);
   }
 
-  /** Initialize workers */
+  /**
+   * Set the desired worker count and re-init the pool if needed.
+   * Call this BEFORE crack() whenever the thread count may have changed.
+   * No-op if count is unchanged and workers are already running.
+   */
+  setWorkerCount(n) {
+    const desired = Math.max(1, n || 1);
+    if (this.workers.length === desired) {
+      console.log(`[Pool] Worker count unchanged (${desired}) — reusing existing workers`);
+      return;
+    }
+    console.log(`[Pool] Changing worker count: ${this.workers.length} → ${desired}`);
+    this.maxWorkers = desired;
+    this.terminate();
+    this.init();
+  }
+
+  /** Initialize workers (always creates exactly maxWorkers) */
   init() {
     this.terminate();
     for (let i = 0; i < this.maxWorkers; i++) {
@@ -29,7 +46,7 @@ class WorkerPool {
     console.log(`[Pool] ${this.workers.length} workers created`);
   }
 
-  /** Terminate all workers */
+  /** Fully destroy all workers (used on count change or explicit teardown) */
   terminate() {
     this.workers.forEach(w => w.terminate());
     this.workers = [];
@@ -116,7 +133,6 @@ class WorkerPool {
   _runDictionaryAttack(targetHash, dictionary, onProgress) {
     return new Promise((resolve) => {
       const worker = this.workers[0];
-
       const cleanup = () => { worker.onmessage = null; worker.onerror = null; };
 
       worker.onmessage = (e) => {
@@ -131,21 +147,9 @@ class WorkerPool {
             total: dictionary.length
           });
         }
-
-        if (type === 'found') {
-          cleanup();
-          resolve({ found: true, password: data.password, attempts: data.attempts });
-        }
-
-        if (type === 'exhausted') {
-          cleanup();
-          resolve({ found: false, attempts: data.attempts });
-        }
-
-        if (type === 'cancelled') {
-          cleanup();
-          resolve({ found: false, attempts: data.attempts || 0 });
-        }
+        if (type === 'found')     { cleanup(); resolve({ found: true,  password: data.password, attempts: data.attempts }); }
+        if (type === 'exhausted') { cleanup(); resolve({ found: false, attempts: data.attempts }); }
+        if (type === 'cancelled') { cleanup(); resolve({ found: false, attempts: data.attempts || 0 }); }
       };
 
       worker.onerror = (err) => {
@@ -166,15 +170,15 @@ class WorkerPool {
    */
   _runBruteForceAttack(targetHash, passwordType, options, baseAttempts) {
     return new Promise((resolve) => {
-      const numWorkers = this.workers.length;
-      const totalSpace = PasswordSpaces.getEstimatedAttempts(passwordType.id, options);
-      const rangeSize  = Math.ceil(totalSpace / numWorkers);
-      let completed    = 0;
+      const numWorkers  = this.workers.length;
+      const totalSpace  = PasswordSpaces.getEstimatedAttempts(passwordType.id, options);
+      const rangeSize   = Math.ceil(totalSpace / numWorkers);
+      let completed     = 0;
       let totalAttempts = 0;
-      let found        = false;
+      let found         = false;
 
-      const attemptsAggregator = {}; // workerId -> cumulative attempts
-      const speedAggregator    = {}; // workerId -> last reported H/s
+      const attemptsAggregator = {};
+      const speedAggregator    = {};
       let lastProgressLog      = 0;
 
       console.log(`[Pool] \uD83D\uDD28 Distributing ${totalSpace.toLocaleString()} attempts across ${numWorkers} workers (${rangeSize.toLocaleString()} per worker)`);
@@ -245,10 +249,20 @@ class WorkerPool {
     });
   }
 
-  /** Cancel all active tasks */
+  /**
+   * Cancel all active tasks — sends cancel signal but keeps workers ALIVE.
+   * Workers will reply with type:'cancelled' and go idle, ready to accept
+   * new work on resume. Use terminate() to fully destroy workers.
+   */
   cancel() {
-    console.log('[Pool] \uD83D\uDED1 Cancelling all workers');
-    this.workers.forEach(w => w.postMessage({ action: 'cancel' }));
+    console.log('[Pool] \uD83D\uDED1 Cancelling all workers (workers remain alive)');
+    this.workers.forEach(w => {
+      w.postMessage({ action: 'cancel' });
+      // Clear any in-flight message handlers so stale cancelled replies
+      // don't interfere with the next crack() call.
+      w.onmessage = null;
+      w.onerror   = null;
+    });
     this.activeTask = null;
   }
 }
