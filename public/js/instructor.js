@@ -21,8 +21,10 @@ let currentSpace = null;
 let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
-// --- Throttled UI state for Candidate / Speed / Estimated (max once per 3s) ---
-const STATS_UI_UPDATE_MS = 3000;
+// --- Throttled UI state for Candidate / Speed / Estimated ---
+// Increase this value to slow down UI refresh during cracking (milliseconds).
+// Lower values = more frequent updates but more DOM churn.
+const STATS_UI_UPDATE_MS = 5000;
 let lastStatsUiUpdateAt = 0;
 let latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
 
@@ -500,7 +502,7 @@ async function processBatch() {
 }
 
 function updateProgress(progress) {
-  // Buffer the 3 volatile fields — they are flushed to DOM at most once per 3s
+  // Buffer the 3 volatile fields — flushed to DOM at most once per STATS_UI_UPDATE_MS
   latestStatsUi.candidate = progress.current || '—';
   latestStatsUi.speed     = formatSpeed(progress.speed || 0);
 
@@ -531,7 +533,7 @@ function updateProgress(progress) {
   document.getElementById('metric-phase').textContent =
     `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
 
-  // Flush candidate/speed/estimated at most once per 3 seconds
+  // Flush candidate/speed/estimated at most once per STATS_UI_UPDATE_MS
   flushThrottledStatsUi(false);
 }
 
