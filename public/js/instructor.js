@@ -13,7 +13,8 @@ let crackingState = {
   startTime: null,
   totalAttempts: 0,
   totalTime: 0,
-  crackedCount: 0
+  crackedCount: 0,
+  currentPhase: null   // tracks active phase for speed-avg reset on phase switch
 };
 let submissions = [];
 let allSpaces = [];
@@ -22,8 +23,6 @@ let progressInterval = null;
 let totalCores = navigator.hardwareConcurrency || 4;
 
 // --- Throttled UI state for Candidate / Speed / Estimated ---
-// Increase this value to slow down UI refresh during cracking (milliseconds).
-// Lower values = more frequent updates but more DOM churn.
 const STATS_UI_UPDATE_MS = 5000;
 let lastStatsUiUpdateAt = 0;
 let latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
@@ -36,9 +35,12 @@ function flushThrottledStatsUi(force = false) {
   document.getElementById('metric-estimated').textContent = latestStatsUi.estimated;
   lastStatsUiUpdateAt = now;
 }
+
+// --- #3: Dictionary cache (per cracking session, keyed by passwordTypeId) ---
+// Cleared at startCracking() so a new session always re-fetches fresh lists.
+const sessionDictionaryCache = new Map();
 // ---------------------------------------------------------------------------
 
-// API Base URL detection
 function getApiBaseUrl() {
   const hostname = window.location.hostname;
   if (hostname.includes('.pages.dev')) {
@@ -49,7 +51,6 @@ function getApiBaseUrl() {
 
 const API_BASE = getApiBaseUrl();
 
-// Get dictionary count for a password type
 function getDictionaryInfo(passwordTypeId) {
   const type = PasswordSpaces.getMetadata(passwordTypeId);
   if (!type || !type.bruteForceStrategy) return { count: 0, urls: [], tooltip: '' };
@@ -118,10 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function startPolling(intervalMs) {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   if (intervalMs > 0) {
     pollTimer = setInterval(loadSubmissions, intervalMs);
     console.log('Polling started: every ' + (intervalMs/1000) + 's');
@@ -133,10 +131,7 @@ function startPolling(intervalMs) {
 async function loadSpaces() {
   try {
     const res = await fetch(API_BASE + '/api/spaces');
-    if (!res.ok) {
-      console.error('Failed to load spaces');
-      return;
-    }
+    if (!res.ok) { console.error('Failed to load spaces'); return; }
     allSpaces = await res.json();
     
     const spaceSelect = document.getElementById('space-filter-select');
@@ -165,9 +160,7 @@ async function loadSpaces() {
       spaceSelect.value = currentSpace;
     }
     
-    if (currentSpace) {
-      await loadSubmissions();
-    }
+    if (currentSpace) await loadSubmissions();
     
   } catch (e) {
     console.error('Error loading spaces:', e);
@@ -184,7 +177,6 @@ function getFilteredUncracked() {
   const selectedTypes = Array.from(
     document.querySelectorAll('#type-filter-checkboxes input[type="checkbox"]:checked')
   ).map(cb => cb.value);
-  
   return filtered.filter(s => !s.cracked && selectedTypes.includes(s.passwordTypeId));
 }
 
@@ -218,8 +210,8 @@ function populateTypeFilters() {
     label.className = 'checkbox-label';
     label.title = dictInfo.tooltip;
     
-    const countDisplay = count === 0 
-      ? '<span style="color:#444">[0]</span>' 
+    const countDisplay = count === 0
+      ? '<span style="color:#444">[0]</span>'
       : `<span style="color:#666">[${count} left]</span>`;
     
     label.innerHTML = `
@@ -238,29 +230,25 @@ function populateTypeFilters() {
 
 function updateModeUI() {
   const mode = document.querySelector('input[name="crack-mode"]:checked').value;
-  const isGPU = mode === 'gpu';
+  const isGPU    = mode === 'gpu';
   const isSingle = mode === 'single';
-  const isMulti = mode === 'multi';
+  const isMulti  = mode === 'multi';
   
-  document.getElementById('btn-start-crack').style.display = isGPU ? 'none' : 'inline-block';
+  document.getElementById('btn-start-crack').style.display  = isGPU ? 'none' : 'inline-block';
   document.getElementById('btn-download-gpu').style.display = isGPU ? 'inline-block' : 'none';
   
   const infoEl = document.getElementById('mode-info');
   if (!infoEl) return;
   
-  if (isGPU) {
-    infoEl.innerHTML = 'Export: <span>Python script</span>';
-  } else if (isSingle) {
-    infoEl.innerHTML = 'Workers: <span id="worker-count">1</span> thread';
-  } else if (isMulti) {
-    infoEl.innerHTML = `Workers: <span id="worker-count">${totalCores}</span> threads`;
-  }
+  if (isGPU)         infoEl.innerHTML = 'Export: <span>Python script</span>';
+  else if (isSingle) infoEl.innerHTML = 'Workers: <span id="worker-count">1</span> thread';
+  else if (isMulti)  infoEl.innerHTML = `Workers: <span id="worker-count">${totalCores}</span> threads`;
 }
 
 function getWorkerCount() {
   const mode = document.querySelector('input[name="crack-mode"]:checked').value;
   if (mode === 'single') return 1;
-  if (mode === 'multi') return totalCores;
+  if (mode === 'multi')  return totalCores;
   return 1;
 }
 
@@ -278,9 +266,7 @@ async function loadSubmissions() {
     populateTypeFilters();
     updateSummary();
     
-    if (!crackingState.active) {
-      updateStatus('IDLE');
-    }
+    if (!crackingState.active) updateStatus('IDLE');
   } catch (e) {
     console.error('Error loading submissions:', e);
   }
@@ -290,59 +276,41 @@ function updateStatus(status, message = '') {
   const statusEl = document.getElementById('crack-status');
   if (!statusEl) return;
   
-  let statusText = '';
-  let statusColor = '#888';
-  
-  switch(status) {
-    case 'IDLE':
-      statusText = 'Ready';
-      statusColor = '#4cff80';
-      break;
-    case 'CRACKING':
-      statusText = 'Cracking...';
-      statusColor = '#ffaa00';
-      break;
-    case 'PAUSED':
-      statusText = 'Paused';
-      statusColor = '#ff8800';
-      break;
-    case 'COMPLETE':
-      statusText = 'Complete';
-      statusColor = '#4cff80';
-      break;
-    case 'ERROR':
-      statusText = 'Error';
-      statusColor = '#f66';
-      break;
-  }
-  
-  statusEl.textContent = statusText + (message ? ': ' + message : '');
-  statusEl.style.color = statusColor;
+  const map = {
+    IDLE:     { text: 'Ready',      color: '#4cff80' },
+    CRACKING: { text: 'Cracking...', color: '#ffaa00' },
+    PAUSED:   { text: 'Paused',     color: '#ff8800' },
+    COMPLETE: { text: 'Complete',   color: '#4cff80' },
+    ERROR:    { text: 'Error',      color: '#f66'    }
+  };
+  const s = map[status] || { text: status, color: '#888' };
+  statusEl.textContent = s.text + (message ? ': ' + message : '');
+  statusEl.style.color = s.color;
 }
 
 function updateSummary() {
   const filtered = getFilteredSubmissions();
-  const cracked = filtered.filter(s => s.cracked).length;
-  const total = filtered.length;
+  const cracked   = filtered.filter(s => s.cracked).length;
+  const total     = filtered.length;
   const remaining = total - cracked;
-  const percent = total > 0 ? Math.round((cracked / total) * 100) : 0;
+  const percent   = total > 0 ? Math.round((cracked / total) * 100) : 0;
   
-  document.getElementById('summary-total').textContent = total;
-  document.getElementById('summary-cracked').textContent = `${cracked} (${percent}%)`;
+  document.getElementById('summary-total').textContent     = total;
+  document.getElementById('summary-cracked').textContent   = `${cracked} (${percent}%)`;
   document.getElementById('summary-remaining').textContent = remaining;
   
   if (crackingState.startTime) {
-    const elapsed = Date.now() - crackingState.startTime;
-    document.getElementById('summary-time').textContent = formatDuration(elapsed);
+    document.getElementById('summary-time').textContent =
+      formatDuration(Date.now() - crackingState.startTime);
   }
 }
 
 function formatDuration(ms) {
-  const seconds = Math.floor(ms / 1000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
 async function startCracking() {
@@ -359,44 +327,49 @@ async function startCracking() {
     return;
   }
   
-  crackingState.active = true;
-  crackingState.paused = false;
-  crackingState.batch = uncracked;
-  crackingState.batchIndex = 0;
-  crackingState.startTime = Date.now();
+  // #3: Clear dictionary cache so this session always starts with fresh lists
+  sessionDictionaryCache.clear();
+  console.log('[Dict] Session cache cleared for new cracking run');
+  
+  crackingState.active       = true;
+  crackingState.paused       = false;
+  crackingState.batch        = uncracked;
+  crackingState.batchIndex   = 0;
+  crackingState.startTime    = Date.now();
   crackingState.crackedCount = 0;
   crackingState.totalAttempts = 0;
+  crackingState.currentPhase = null;
   
-  // Reset throttle state and force-clear the 3 fields
   lastStatsUiUpdateAt = 0;
   latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
   flushThrottledStatsUi(true);
   
-  // Apply the selected worker count — re-inits pool only if count changed
   const numWorkers = getWorkerCount();
   console.log(`Starting cracking with ${numWorkers} workers, ${uncracked.length} hashes`);
   workerPool.setWorkerCount(numWorkers);
   
-  // Start logger session
-  if (typeof ProgressLogger !== 'undefined') {
-    ProgressLogger.startSession();
-  }
+  if (typeof ProgressLogger !== 'undefined') ProgressLogger.startSession();
   
   updateStatus('CRACKING');
-  document.getElementById('btn-start-crack').style.display = 'none';
-  document.getElementById('btn-pause-crack').style.display = 'inline-block';
-  document.getElementById('btn-stop-crack').style.display = 'inline-block';
+  document.getElementById('btn-start-crack').style.display  = 'none';
+  document.getElementById('btn-pause-crack').style.display  = 'inline-block';
+  document.getElementById('btn-stop-crack').style.display   = 'inline-block';
   
   await processBatch();
 }
 
 async function processBatch() {
-  while (crackingState.batchIndex < crackingState.batch.length && crackingState.active && !crackingState.paused) {
+  while (
+    crackingState.batchIndex < crackingState.batch.length &&
+    crackingState.active &&
+    !crackingState.paused
+  ) {
     const submission = crackingState.batch[crackingState.batchIndex];
-    crackingState.currentId = submission.id;
+    crackingState.currentId   = submission.id;
     crackingState.currentHash = submission.hash;
+    crackingState.currentPhase = null;  // reset phase tracking per hash
     
-    document.getElementById('metric-hash').textContent = submission.hash.substring(0, 16) + '...';
+    document.getElementById('metric-hash').textContent  = submission.hash.substring(0, 16) + '...';
     document.getElementById('metric-phase').textContent = `Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
     
     const passwordType = PasswordSpaces.getMetadata(submission.passwordTypeId);
@@ -406,53 +379,63 @@ async function processBatch() {
       continue;
     }
     
-    // Log hash start
     if (typeof ProgressLogger !== 'undefined') {
       ProgressLogger.onHashStart(submission.id, submission.hash, submission.passwordTypeId);
     }
     
-    const useDictionary = document.getElementById('opt-dictionary')?.checked;
+    const useDictionary  = document.getElementById('opt-dictionary')?.checked;
     const truncationMode = document.getElementById('opt-truncation')?.value || 'full';
     
+    // #3: Load dictionary once per type per session using cache
     let dictionary = [];
     if (useDictionary && typeof dictionaryLoader !== 'undefined') {
-      try {
-        console.log(`Loading dictionary for password type: ${passwordType.id}`);
-        dictionary = await dictionaryLoader.loadForType(passwordType);
-        
-        if (dictionary.length === 0) {
-          console.warn('⚠️ Dictionary failed to load or empty - using brute-force only');
-          updateStatus('CRACKING', 'Dictionary unavailable - using brute-force');
-        } else {
-          console.log(`✅ Loaded ${dictionary.length} dictionary words for ${passwordType.id}`);
-          updateStatus('CRACKING');
-          
-          // Log dictionary phase
-          if (typeof ProgressLogger !== 'undefined') {
-            ProgressLogger.onPhaseChange('dictionary', submission.id);
+      const typeId = passwordType.id;
+      if (sessionDictionaryCache.has(typeId)) {
+        dictionary = sessionDictionaryCache.get(typeId);
+        console.log(`[Dict] Cache HIT for ${typeId}: ${dictionary.length} words`);
+      } else {
+        try {
+          console.log(`[Dict] Cache MISS for ${typeId} — loading...`);
+          dictionary = await dictionaryLoader.loadForType(passwordType);
+          sessionDictionaryCache.set(typeId, dictionary);
+          if (dictionary.length === 0) {
+            console.warn(`⚠️ Dictionary empty for ${typeId} — brute-force only`);
+            updateStatus('CRACKING', 'Dictionary unavailable — using brute-force');
+          } else {
+            console.log(`✅ Loaded & cached ${dictionary.length} words for ${typeId}`);
+            updateStatus('CRACKING');
           }
+        } catch (e) {
+          console.error('Failed to load dictionary for type:', typeId, e);
+          updateStatus('CRACKING', 'Dictionary error — using brute-force only');
+          dictionary = [];
+          sessionDictionaryCache.set(typeId, []); // cache the failure so we don't retry
         }
-      } catch (e) {
-        console.error('Failed to load dictionary for type:', passwordType.id, e);
-        updateStatus('CRACKING', 'Dictionary error - using brute-force only');
-        dictionary = [];
       }
     }
     
+    // #4: onPhaseChange is now in options so the pool can call it directly.
+    // #5: When the phase changes, reset the speed rolling avg via ProgressLogger.
     const options = {
-      dictionary: dictionary,
-      truncationMode: truncationMode,
+      dictionary,
+      truncationMode,
+      onPhaseChange: (phase, threadCount) => {
+        // #5: Reset speed average on every phase transition
+        if (phase !== crackingState.currentPhase) {
+          crackingState.currentPhase = phase;
+          if (typeof ProgressLogger !== 'undefined') {
+            ProgressLogger.onPhaseChange(phase, submission.id);
+            if (typeof ProgressLogger.resetSpeedAverage === 'function') {
+              ProgressLogger.resetSpeedAverage();
+            }
+          }
+          console.log(`[Phase] → ${phase} (${threadCount} thread${threadCount > 1 ? 's' : ''})`);
+        }
+      },
       onProgress: (progress) => {
         updateProgress(progress);
-        
-        // Log progress updates
         if (typeof ProgressLogger !== 'undefined') {
           ProgressLogger.onProgress(progress);
-          
-          // Detect phase change to brute-force
-          if (progress.phase === 'brute-force' && dictionary.length > 0) {
-            ProgressLogger.onPhaseChange('brute-force', submission.id);
-          }
         }
       }
     };
@@ -467,15 +450,11 @@ async function processBatch() {
         console.log(`✅ Cracked ${submission.hash}: ${result.password} (${result.attempts} attempts, ${result.duration}ms)`);
         await saveCrackedPassword(submission.id, result.password, result.attempts, result.duration);
         crackingState.crackedCount++;
-        
-        // Log successful crack
         if (typeof ProgressLogger !== 'undefined') {
           ProgressLogger.onHashCracked(submission.id, result.password, result.attempts, hashDuration);
         }
       } else {
         console.log(`❌ Failed to crack ${submission.hash} after ${result.attempts} attempts`);
-        
-        // Log failed crack
         if (typeof ProgressLogger !== 'undefined') {
           ProgressLogger.onHashFailed(submission.id, result.attempts, hashDuration);
         }
@@ -485,8 +464,6 @@ async function processBatch() {
       
     } catch (err) {
       console.error('Error cracking hash:', err);
-      
-      // Log error
       if (typeof ProgressLogger !== 'undefined') {
         ProgressLogger.logEvent('error', `Error cracking hash: ${err.message}`);
       }
@@ -496,23 +473,19 @@ async function processBatch() {
     updateSummary();
   }
   
-  if (crackingState.batchIndex >= crackingState.batch.length) {
-    finishCracking();
-  }
+  if (crackingState.batchIndex >= crackingState.batch.length) finishCracking();
 }
 
 function updateProgress(progress) {
-  // Buffer the 3 volatile fields — flushed to DOM at most once per STATS_UI_UPDATE_MS
   latestStatsUi.candidate = progress.current || '—';
   latestStatsUi.speed     = formatSpeed(progress.speed || 0);
 
-  // Attempts, elapsed and progress bar update every call (low flicker, needed for accuracy)
   document.getElementById('metric-attempts').textContent =
     `${formatNumber(progress.attempts || 0)} / ${formatNumber(progress.total || 0)}`;
 
   if (crackingState.startTime) {
-    const elapsed = Date.now() - crackingState.startTime;
-    document.getElementById('metric-elapsed').textContent = formatTime(elapsed);
+    document.getElementById('metric-elapsed').textContent =
+      formatTime(Date.now() - crackingState.startTime);
   }
 
   if (progress.total && progress.attempts) {
@@ -522,8 +495,7 @@ function updateProgress(progress) {
 
     if (progress.speed > 0 && progress.total > progress.attempts) {
       const remaining = progress.total - progress.attempts;
-      const eta = Math.ceil(remaining / progress.speed) * 1000;
-      latestStatsUi.estimated = formatTime(eta);
+      latestStatsUi.estimated = formatTime(Math.ceil(remaining / progress.speed) * 1000);
     } else {
       latestStatsUi.estimated = '—';
     }
@@ -531,21 +503,20 @@ function updateProgress(progress) {
 
   const phaseText = progress.phase === 'dictionary' ? 'Dictionary attack' : 'Brute-force';
   document.getElementById('metric-phase').textContent =
-    `${phaseText} - Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
+    `${phaseText} — Hash ${crackingState.batchIndex + 1} of ${crackingState.batch.length}`;
 
-  // Flush candidate/speed/estimated at most once per STATS_UI_UPDATE_MS
   flushThrottledStatsUi(false);
 }
 
 function formatSpeed(speed) {
   if (speed >= 1000000) return (speed / 1000000).toFixed(1) + ' MH/s';
-  if (speed >= 1000) return (speed / 1000).toFixed(1) + ' KH/s';
+  if (speed >= 1000)    return (speed / 1000).toFixed(1) + ' KH/s';
   return Math.round(speed) + ' H/s';
 }
 
 function formatNumber(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  if (num >= 1000)    return (num / 1000).toFixed(1) + 'K';
   return num.toString();
 }
 
@@ -556,9 +527,7 @@ function formatTime(ms) {
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
   if (minutes < 60) return `${minutes}m ${secs}s`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours}h ${mins}m`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 async function saveCrackedPassword(id, password, attempts, durationMs) {
@@ -566,24 +535,15 @@ async function saveCrackedPassword(id, password, attempts, durationMs) {
     const res = await fetch(API_BASE + `/api/crack/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        password: password,
-        attempts: attempts,
-        crackedAt: Date.now(),
-        crackDurationMs: durationMs
-      })
+      body: JSON.stringify({ password, attempts, crackedAt: Date.now(), crackDurationMs: durationMs })
     });
     
     if (res.ok) {
       const sub = submissions.find(s => s.id === id);
       if (sub) {
-        sub.password = password;
-        sub.cracked = true;
-        sub.crackedAt = Date.now();
-        sub.attempts = attempts;
-        sub.crackDurationMs = durationMs;
+        sub.password = password; sub.cracked = true;
+        sub.crackedAt = Date.now(); sub.attempts = attempts; sub.crackDurationMs = durationMs;
       }
-      
       const crackedCell = document.getElementById('crack-' + id);
       if (crackedCell) {
         crackedCell.innerHTML = '✅ <strong>' + password + '</strong>';
@@ -598,67 +558,42 @@ async function saveCrackedPassword(id, password, attempts, durationMs) {
 }
 
 function finishCracking() {
-  crackingState.active = false;
-  crackingState.paused = false;
+  crackingState.active  = false;
+  crackingState.paused  = false;
   
-  // End logger session
-  if (typeof ProgressLogger !== 'undefined') {
-    ProgressLogger.endSession('complete');
-  }
+  if (typeof ProgressLogger !== 'undefined') ProgressLogger.endSession('complete');
   
   updateStatus('COMPLETE', `${crackingState.crackedCount} passwords cracked`);
   
   document.getElementById('btn-start-crack').style.display = 'inline-block';
   document.getElementById('btn-pause-crack').style.display = 'none';
-  document.getElementById('btn-stop-crack').style.display = 'none';
-  
-  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
-  document.getElementById('progress-fill').style.width = '100%';
-  document.getElementById('progress-text').textContent = '100%';
+  document.getElementById('btn-stop-crack').style.display  = 'none';
+  document.getElementById('btn-pause-crack').textContent   = '⏸️ PAUSE';
+  document.getElementById('progress-fill').style.width     = '100%';
+  document.getElementById('progress-text').textContent     = '100%';
 
-  // Force-flush final stats values
   flushThrottledStatsUi(true);
-  
   loadSubmissions();
 }
 
 function togglePause() {
-  if (crackingState.paused) {
-    resumeCracking();
-  } else {
-    pauseCracking();
-  }
+  if (crackingState.paused) resumeCracking(); else pauseCracking();
 }
 
 function pauseCracking() {
   crackingState.paused = true;
   updateStatus('PAUSED');
   document.getElementById('btn-pause-crack').textContent = '▶️ RESUME';
-  
-  if (typeof ProgressLogger !== 'undefined') {
-    ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
-  }
-  
-  // Send cancel signal to stop current work — workers stay alive for resume
-  if (workerPool) {
-    workerPool.cancel();
-  }
+  if (typeof ProgressLogger !== 'undefined') ProgressLogger.logEvent('warning', '⏸️ Cracking paused');
+  if (workerPool) workerPool.cancel();
 }
 
 function resumeCracking() {
   crackingState.paused = false;
   updateStatus('CRACKING');
   document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
-  
-  if (typeof ProgressLogger !== 'undefined') {
-    ProgressLogger.logEvent('info', '▶️ Cracking resumed');
-  }
-  
-  // Ensure workers are alive with the correct count before resuming
-  // (cancel() keeps them alive, but setWorkerCount guards against any edge case)
-  const numWorkers = getWorkerCount();
-  workerPool.setWorkerCount(numWorkers);
-  
+  if (typeof ProgressLogger !== 'undefined') ProgressLogger.logEvent('info', '▶️ Cracking resumed');
+  workerPool.setWorkerCount(getWorkerCount());
   processBatch();
 }
 
@@ -666,52 +601,37 @@ function stopCracking() {
   crackingState.active = false;
   crackingState.paused = false;
   
-  if (workerPool) {
-    workerPool.cancel();
-  }
-  
-  // End logger session
-  if (typeof ProgressLogger !== 'undefined') {
-    ProgressLogger.endSession('stopped by user');
-  }
+  if (workerPool) workerPool.cancel();
+  if (typeof ProgressLogger !== 'undefined') ProgressLogger.endSession('stopped by user');
   
   updateStatus('IDLE', 'Stopped by user');
   
   document.getElementById('btn-start-crack').style.display = 'inline-block';
   document.getElementById('btn-pause-crack').style.display = 'none';
-  document.getElementById('btn-stop-crack').style.display = 'none';
-  document.getElementById('btn-pause-crack').textContent = '⏸️ PAUSE';
+  document.getElementById('btn-stop-crack').style.display  = 'none';
+  document.getElementById('btn-pause-crack').textContent   = '⏸️ PAUSE';
   
-  document.getElementById('progress-fill').style.width = '0%';
-  document.getElementById('progress-text').textContent = '0%';
-  document.getElementById('metric-hash').textContent = '—';
-  document.getElementById('metric-attempts').textContent = '0 / 0';
-  document.getElementById('metric-elapsed').textContent = '00:00';
-  document.getElementById('metric-phase').textContent = 'Stopped';
+  document.getElementById('progress-fill').style.width     = '0%';
+  document.getElementById('progress-text').textContent     = '0%';
+  document.getElementById('metric-hash').textContent       = '—';
+  document.getElementById('metric-attempts').textContent   = '0 / 0';
+  document.getElementById('metric-elapsed').textContent    = '00:00';
+  document.getElementById('metric-phase').textContent      = 'Stopped';
 
-  // Force-clear the throttled fields immediately
   latestStatsUi = { candidate: '—', speed: '0 H/s', estimated: '—' };
   flushThrottledStatsUi(true);
-  
   loadSubmissions();
 }
 
-// FIXED: Use API endpoint instead of generating basic stub
 async function downloadGPUScript() {
   const uncracked = getFilteredUncracked();
-  
-  if (uncracked.length === 0) {
-    alert('No uncracked hashes to export');
-    return;
-  }
+  if (uncracked.length === 0) { alert('No uncracked hashes to export'); return; }
   
   const filtered = getFilteredSubmissions();
-  const cracked = filtered.filter(s => s.cracked).length;
-  
   const exportMetadata = {
     instructorSession: crypto.randomUUID(),
     totalSubmissions: filtered.length,
-    crackedCount: cracked,
+    crackedCount: filtered.filter(s => s.cracked).length,
     browserAttempts: crackingState.totalAttempts,
     browserDurationMs: crackingState.startTime ? (Date.now() - crackingState.startTime) : 0,
     stoppedReason: crackingState.active ? 'export_during_session' : 'user_export'
@@ -720,28 +640,21 @@ async function downloadGPUScript() {
   try {
     const res = await fetch(API_BASE + '/api/export-gpu-script', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        remainingHashes: uncracked.map(h => h.id),
-        exportMetadata: exportMetadata
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ remainingHashes: uncracked.map(h => h.id), exportMetadata })
     });
     
-    if (!res.ok) {
-      alert('Failed to export GPU script: ' + res.status);
-      return;
-    }
+    if (!res.ok) { alert('Failed to export GPU script: ' + res.status); return; }
     
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = 'gpu-cracker-' + new Date().toISOString().split('T')[0] + '.py';
     a.click();
     URL.revokeObjectURL(url);
     
     console.log('✅ GPU script exported successfully');
-    
     if (typeof ProgressLogger !== 'undefined') {
       ProgressLogger.logEvent('info', `📥 GPU script exported for ${uncracked.length} hashes`);
     }
@@ -793,7 +706,7 @@ function renderTable(subs) {
   tbody.onclick = (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
-    const id = btn.getAttribute('data-id');
+    const id  = btn.getAttribute('data-id');
     const sub = submissions.find(x => x.id === id);
     if (!sub) return;
     const action = btn.getAttribute('data-action');
@@ -805,40 +718,37 @@ function renderTable(subs) {
 function guessDeviceType(ua) {
   if (!ua || ua === 'unknown') return '❓ Unknown';
   if (/bot|crawler|spider|headless|python|curl|wget|go-http/i.test(ua)) return '🤖 Bot';
-  if (/iphone/i.test(ua)) return '📱 iPhone (iOS)';
-  if (/ipad/i.test(ua)) return '📟 iPad (iOS)';
-  if (/android/i.test(ua) && /mobile/i.test(ua)) return '📱 Android';
-  if (/android/i.test(ua)) return '📟 Android Tablet';
-  if (/windows phone/i.test(ua)) return '📱 Windows Phone';
-  if (/blackberry|bb10/i.test(ua)) return '📱 BlackBerry';
-  if (/windows nt/i.test(ua)) return '🖥 Desktop (Windows)';
-  if (/macintosh|mac os x/i.test(ua)) return '🖥 Desktop (macOS)';
-  if (/cros/i.test(ua)) return '🖥 Desktop (ChromeOS)';
-  if (/linux/i.test(ua)) return '🖥 Desktop (Linux)';
+  if (/iphone/i.test(ua))                                               return '📱 iPhone (iOS)';
+  if (/ipad/i.test(ua))                                                 return '📟 iPad (iOS)';
+  if (/android/i.test(ua) && /mobile/i.test(ua))                       return '📱 Android';
+  if (/android/i.test(ua))                                              return '📟 Android Tablet';
+  if (/windows phone/i.test(ua))                                        return '📱 Windows Phone';
+  if (/blackberry|bb10/i.test(ua))                                      return '📱 BlackBerry';
+  if (/windows nt/i.test(ua))                                           return '🖥 Desktop (Windows)';
+  if (/macintosh|mac os x/i.test(ua))                                   return '🖥 Desktop (macOS)';
+  if (/cros/i.test(ua))                                                 return '🖥 Desktop (ChromeOS)';
+  if (/linux/i.test(ua))                                                return '🖥 Desktop (Linux)';
   return '🖥 Desktop';
 }
 
 function formatCrackDuration(sub) {
   if (!sub.crackDurationMs) return '';
   const ms = sub.crackDurationMs;
-  if (ms < 1000) return ms + 'ms';
+  if (ms < 1000)  return ms + 'ms';
   if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
   const minutes = Math.floor(ms / 60000);
-  const secs = ((ms % 60000) / 1000).toFixed(0);
-  return `${minutes}m ${secs}s`;
+  return `${minutes}m ${((ms % 60000) / 1000).toFixed(0)}s`;
 }
 
 function showMeta(sub) {
   const payload = {
-    id: sub.id,
-    hash: sub.hash,
-    spaceId: sub.spaceId,
+    id: sub.id, hash: sub.hash, spaceId: sub.spaceId,
     passwordTypeId: sub.passwordTypeId,
-    submitted: sub.submitted ? new Date(sub.submitted).toISOString() : null,
-    cracked: sub.cracked,
-    password: sub.password || null,
-    crackedAt: sub.crackedAt ? new Date(sub.crackedAt).toISOString() : null,
-    attempts: sub.attempts,
+    submitted:  sub.submitted  ? new Date(sub.submitted).toISOString()  : null,
+    cracked:    sub.cracked,
+    password:   sub.password   || null,
+    crackedAt:  sub.crackedAt  ? new Date(sub.crackedAt).toISOString()  : null,
+    attempts:   sub.attempts,
     crackDurationMs: sub.crackDurationMs || null,
     meta: sub.meta || {}
   };
@@ -856,17 +766,12 @@ function syntaxHighlightJson(obj) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return json.replace(
     /(&quot;(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\&])*&quot;(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-    function(match) {
-      var cls = 'color:#ce9178';
-      if (/^&quot;/.test(match)) {
-        if (/:$/.test(match)) cls = 'color:#9cdcfe';
-      } else if (/true|false/.test(match)) {
-        cls = 'color:#569cd6';
-      } else if (/null/.test(match)) {
-        cls = 'color:#808080';
-      } else {
-        cls = 'color:#b5cea8';
-      }
+    (match) => {
+      let cls = 'color:#ce9178';
+      if (/^&quot;/.test(match))  cls = /:$/.test(match) ? 'color:#9cdcfe' : 'color:#ce9178';
+      else if (/true|false/.test(match)) cls = 'color:#569cd6';
+      else if (/null/.test(match))       cls = 'color:#808080';
+      else                               cls = 'color:#b5cea8';
       return '<span style="' + cls + '">' + match + '</span>';
     }
   );
@@ -885,33 +790,24 @@ async function deleteAll() {
 
 function exportCSV() {
   const filteredSubs = getFilteredSubmissions();
-  if (filteredSubs.length === 0) {
-    alert('No submissions to export');
-    return;
-  }
+  if (filteredSubs.length === 0) { alert('No submissions to export'); return; }
   
   let csv = 'ID,Hash,Type,Password,Cracked,Submitted,CrackedAt,Attempts,CrackDurationMs,SpaceId,Device,IP\n';
   filteredSubs.forEach(s => {
     const device = guessDeviceType(s.meta && s.meta.userAgent).replace(/,/g, ';');
     csv += [
-      s.id,
-      s.hash,
-      s.passwordTypeId || '',
-      s.password || '',
+      s.id, s.hash, s.passwordTypeId || '', s.password || '',
       s.cracked ? 'Yes' : 'No',
-      s.submitted ? new Date(s.submitted).toISOString() : '',
-      s.crackedAt ? new Date(s.crackedAt).toISOString() : '',
-      s.attempts || '',
-      s.crackDurationMs || '',
-      s.spaceId || '',
-      '"' + device + '"',
-      (s.meta && s.meta.ip) || ''
+      s.submitted  ? new Date(s.submitted).toISOString()  : '',
+      s.crackedAt  ? new Date(s.crackedAt).toISOString()  : '',
+      s.attempts || '', s.crackDurationMs || '', s.spaceId || '',
+      '"' + device + '"', (s.meta && s.meta.ip) || ''
     ].join(',') + '\n';
   });
   
   const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url;
   a.download = 'submissions-' + new Date().toISOString().split('T')[0] + '.csv';
   a.click();
@@ -940,10 +836,8 @@ async function loadSpacesAdmin() {
     spaces.forEach(s => {
       const tr = document.createElement('tr');
       tr.innerHTML =
-        '<td>' + s.id + '</td>' +
-        '<td>' + s.name + '</td>' +
-        '<td>' + (s.location || '-') + '</td>' +
-        '<td>' + (s.description || '-') + '</td>' +
+        '<td>' + s.id + '</td><td>' + s.name + '</td>' +
+        '<td>' + (s.location || '-') + '</td><td>' + (s.description || '-') + '</td>' +
         '<td><button class="btn-sm btn-danger" data-spaceid="' + s.id + '">Delete</button></td>';
       tbody.appendChild(tr);
     });
@@ -951,23 +845,23 @@ async function loadSpacesAdmin() {
       const btn = e.target.closest('button');
       if (!btn) return;
       const id = btn.getAttribute('data-spaceid');
-      if (!id) return;
-      if (!confirm('Delete space "' + id + '"?')) return;
+      if (!id || !confirm('Delete space "' + id + '"?')) return;
       await fetch(API_BASE + '/api/spaces/' + id, { method: 'DELETE' });
       loadSpacesAdmin();
     };
   } catch (e) {
     console.error('Spaces load error:', e);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Network error loading spaces: ' + e.message + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f66">Network error: ' + e.message + '</td></tr>';
   }
 }
 
 async function saveSpaceFromForm() {
-  const id = (document.getElementById('space-id-input')?.value || '').trim();
-  const name = (document.getElementById('space-name-input')?.value || '').trim();
-  const location = (document.getElementById('space-location-input')?.value || '').trim();
-  const description = (document.getElementById('space-desc-input')?.value || '').trim();
-  const status = document.getElementById('space-save-status');
+  const id          = (document.getElementById('space-id-input')?.value       || '').trim();
+  const name        = (document.getElementById('space-name-input')?.value     || '').trim();
+  const location    = (document.getElementById('space-location-input')?.value || '').trim();
+  const description = (document.getElementById('space-desc-input')?.value     || '').trim();
+  const status      = document.getElementById('space-save-status');
+  
   if (!id || !name) {
     if (status) { status.textContent = 'ID and Name are required.'; status.style.color = '#f00'; }
     return;
@@ -975,15 +869,16 @@ async function saveSpaceFromForm() {
   try {
     const res = await fetch(API_BASE + '/api/spaces', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id, name, location, description})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name, location, description })
     });
     if (res.ok) {
-      if (status) { status.textContent = 'Space saved!'; status.style.color = '#0f0'; setTimeout(() => { status.textContent = ''; }, 2000); }
-      document.getElementById('space-id-input').value = '';
-      document.getElementById('space-name-input').value = '';
-      if (document.getElementById('space-location-input')) document.getElementById('space-location-input').value = '';
-      if (document.getElementById('space-desc-input')) document.getElementById('space-desc-input').value = '';
+      if (status) {
+        status.textContent = 'Space saved!'; status.style.color = '#0f0';
+        setTimeout(() => { status.textContent = ''; }, 2000);
+      }
+      ['space-id-input','space-name-input','space-location-input','space-desc-input']
+        .forEach(elId => { const el = document.getElementById(elId); if (el) el.value = ''; });
       loadSpacesAdmin();
     } else {
       const d = await res.json();
